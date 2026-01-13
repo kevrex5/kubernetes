@@ -1,0 +1,40 @@
+# Secrets & credentials
+*.pem
+*.key
+*.crt
+kubeconfig
+.kube/
+secrets/
+*.secret.yaml
+*.secret.yml
+
+# Rendered manifests (source is Helm values, not rendered output)
+/tmp/
+rendered/
+*.rendered.yaml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Helm
+charts/*.tgz
+*.tgz
+
+# Local overrides (use for local testing, never commit)
+*.local.yaml
+*.local.yml
+values.local.yaml
