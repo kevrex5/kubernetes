@@ -1,0 +1,90 @@
+# PDFDing Helm Values
+# Chart: https://charts.pdfding.com (or local chart)
+#
+# Follows AGENTS.md standards:
+# - Pinned image version (no :latest)
+# - Resource limits defined
+# - Security context (restricted PSA compliant)
+# - Secrets via ExternalSecret
+
+replicaCount: 2
+
+image:
+  repository: mrmn/pdfding
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"  # TODO: Pin to actual version (no :latest!)
+
+pdfding:
+  config:
+    hostName: "pdf.<DOMAIN>"  # TODO: Replace
+    hostPort: "8000"
+    defaultTheme: "dark"
+    defaultThemeColor: "blue"
+    logLevel: "INFO"
+
+    accountEmailVerification:
+      enabled: false
+
+    csrfCookieSecure:
+      enabled: true
+    sessionCookieSecure:
+      enabled: true
+    secureSslRedirect:
+      enabled: false  # Traefik handles TLS
+    accountDefaultHttpProtocol: "https"
+
+    database:
+      type: "SQLITE"
+
+    # OIDC Configuration (Authentik)
+    oidc:
+      enabled: true
+      clientId: "placeholder"  # Overridden by existingSecret
+      clientSecret: "placeholder"  # Overridden by existingSecret
+      authUrl: "https://auth.<DOMAIN>/application/o/pdfding/.well-known/openid-configuration"
+      oidc_only:
+        enabled: false
+      providerName: "Authentik"
+
+# Use ExternalSecret for sensitive values
+existingSecret: "pdfding-secrets"
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Pod security (restricted PSA compliant)
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Tolerations for spot instances
+tolerations:
+  - key: kubernetes.azure.com/scalesetpriority
+    operator: Equal
+    value: spot
+    effect: NoSchedule
+
+# Persistence (enable for production)
+persistence:
+  enabled: false

@@ -1,0 +1,15 @@
+---
+# Namespace for pdfding application
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pdfding
+  labels:
+    app.kubernetes.io/name: pdfding
+    app.kubernetes.io/component: document-processing
+    # Application namespace: restricted PSA
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    # Allow Gateway API routing
+    gateway.networking.k8s.io/route-allowed: "true"

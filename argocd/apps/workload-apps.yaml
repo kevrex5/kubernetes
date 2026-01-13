@@ -1,0 +1,54 @@
+---
+# Workloads ApplicationSet
+# Auto-discovers application folders under apps/
+# Each directory becomes an ArgoCD Application
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: workloads
+  namespace: argocd
+spec:
+  generators:
+    # Git directory generator - auto-discovers apps
+    - git:
+        repoURL: https://github.com/<ORG>/<REPO>.git  # TODO: Replace with actual repo
+        revision: HEAD
+        directories:
+          - path: apps/*
+          # Exclude any directories that shouldn't be apps
+          - path: apps/README.md
+            exclude: true
+
+  template:
+    metadata:
+      name: 'app-{{path.basename}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: workloads
+        app.kubernetes.io/name: '{{path.basename}}'
+    spec:
+      project: apps
+
+      source:
+        repoURL: https://github.com/<ORG>/<REPO>.git  # TODO: Replace with actual repo
+        targetRevision: HEAD
+        path: '{{path}}'
+
+      destination:
+        server: https://kubernetes.default.svc
+        # Namespace is defined in app's namespace.yaml or values.yaml
+        namespace: '{{path.basename}}'
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

@@ -1,0 +1,88 @@
+# ArgoCD Installation Values
+# Apply manually during bootstrap:
+#   helm repo add argo https://argoproj.github.io/argo-helm
+#   helm install argocd argo/argo-cd -n argocd --create-namespace -f values.yaml
+
+# Global settings
+global:
+  domain: argocd.<DOMAIN>  # TODO: Replace
+
+# Server configuration
+server:
+  replicas: 2
+
+  # Extra args for insecure mode (TLS terminated at ingress)
+  extraArgs:
+    - --insecure
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Repo server
+repoServer:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Application controller
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Redis
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Disable built-in ingress (we use Gateway API)
+server:
+  ingress:
+    enabled: false
+
+# Config settings
+configs:
+  params:
+    # Server settings
+    server.insecure: true  # TLS at Gateway level
+
+  cm:
+    # URL for ArgoCD
+    url: https://argocd.<DOMAIN>  # TODO: Replace
+
+    # Enable status badge
+    statusbadge.enabled: true
+
+    # Resource customizations (ignore webhook CA bundles)
+    resource.customizations.ignoreDifferences.admissionregistration.k8s.io_ValidatingWebhookConfiguration: |
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    resource.customizations.ignoreDifferences.admissionregistration.k8s.io_MutatingWebhookConfiguration: |
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+
+  # RBAC settings
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      g, argocd-admins, role:admin

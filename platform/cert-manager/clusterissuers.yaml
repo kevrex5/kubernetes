@@ -1,0 +1,43 @@
+---
+# ClusterIssuer - Let's Encrypt Staging (for testing)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: <ADMIN_EMAIL>  # TODO: Replace with your email
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+      - dns01:
+          azureDNS:
+            subscriptionID: <SUBSCRIPTION_ID>  # TODO: Replace
+            resourceGroupName: <DNS_ZONE_RESOURCE_GROUP>  # TODO: Replace
+            hostedZoneName: <DOMAIN>  # TODO: Replace (e.g., rex5.ca)
+            environment: AzurePublicCloud
+            managedIdentity:
+              clientID: <CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>  # TODO: Replace
+
+---
+# ClusterIssuer - Let's Encrypt Production (for real certificates)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: <ADMIN_EMAIL>  # TODO: Replace with your email
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - dns01:
+          azureDNS:
+            subscriptionID: <SUBSCRIPTION_ID>  # TODO: Replace
+            resourceGroupName: <DNS_ZONE_RESOURCE_GROUP>  # TODO: Replace
+            hostedZoneName: <DOMAIN>  # TODO: Replace (e.g., rex5.ca)
+            environment: AzurePublicCloud
+            managedIdentity:
+              clientID: <CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>  # TODO: Replace

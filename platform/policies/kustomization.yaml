@@ -1,0 +1,13 @@
+# Kustomization for baseline NetworkPolicies
+#
+# Use this as a base for app namespaces:
+#   resources:
+#     - ../../platform/policies
+#
+# Or copy individual policies into app folders and customize.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - baseline-app-networkpolicy.yaml

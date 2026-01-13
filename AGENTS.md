@@ -35,18 +35,22 @@ Recommended structure (this repo follows it):
 
 ```
 argocd/
-  projects/               # Argo AppProjects
+  projects/               # Argo AppProjects (platform, apps)
   apps/                   # Root applications (platform + apps)
+  install/                # ArgoCD installation (Helm values)
 
 platform/
   namespaces/             # Namespace manifests + Pod Security labels
   policies/               # NetworkPolicies + baseline policies
-  traefik/                # Helm values + ArgoCD app for Traefik
-  cert-manager/           # Helm values + Issuers/Certificates
-  external-secrets/       # Helm values + SecretStores + identity refs
+  traefik/                # Helm values + Gateway/GatewayClass
+  cert-manager/           # Helm values + ClusterIssuers
+  external-secrets/       # Helm values + ClusterSecretStores
+  authentik/              # SSO/IdP (Helm values + blueprints)
+  monitoring/             # Prometheus, Grafana, Alertmanager
+  shared/                 # Shared resources (wildcard certs, storage classes)
 
 apps/
-  <app-name>/             # One folder per app (Helm values + ArgoCD app)
+  <app-name>/             # One folder per app (Helm values + HTTPRoute)
 
 environments/
   prod/                   # One cluster => prod overlay for the real cluster
@@ -69,19 +73,30 @@ logs/
 - Single AKS cluster.
 - Namespaces separate **platform** vs **apps**.
 - Traefik is the **only** public entrypoint (Service type LoadBalancer).
-- Apps use **Traefik IngressRoute CRDs**.
+- Apps use **Kubernetes Gateway API** (`HTTPRoute`, `TCPRoute`, `GRPCRoute`).
+- A shared `Gateway` resource in `platform-traefik` namespace handles all routing.
 - TLS is issued by **cert-manager** using **Azure DNS DNS-01**.
+- Wildcard certificate (`*.rex5.ca`) is stored in Azure Key Vault and distributed via ESO.
 - Secrets are delivered via **External Secrets Operator** from **Azure Key Vault**.
+- **Authentik** provides SSO/OIDC for internal applications.
 
 ---
 
 ## Security baseline (must remain true)
 
 ### Namespace / Pod Security
-- `apps-*` namespaces: Pod Security Admission **restricted**
-- `platform-*` namespaces: Pod Security Admission **baseline**
+- Application namespaces: Pod Security Admission **restricted**
+- Platform namespaces: Pod Security Admission **baseline**
 
-Namespace labels must be present in `platform/namespaces/*`.
+Required PSA labels on all namespaces:
+```yaml
+labels:
+  pod-security.kubernetes.io/enforce: restricted  # or baseline for platform
+  pod-security.kubernetes.io/audit: restricted
+  pod-security.kubernetes.io/warn: restricted
+```
+
+Namespace manifests must be present in `platform/namespaces/*`.
 
 ### Networking
 - App namespaces have baseline NetworkPolicies:
@@ -219,25 +234,36 @@ Keep Argo apps small and logical:
 
 ## Platform standards
 
-### Traefik (IngressRoute CRDs)
-- Use IngressRoute for routing.
-- Prefer a small, reusable middleware set:
-  - `redirect-to-https`
-  - `security-headers`
-  - `rate-limit` (optional)
-  - `forward-auth` (later, when you add SSO)
+### Traefik (Gateway API)
+- Use **Kubernetes Gateway API** for routing (not IngressRoute CRDs).
+- Resources:
+  - `GatewayClass` — defines Traefik as the controller
+  - `Gateway` — shared gateway in `platform-traefik` namespace
+  - `HTTPRoute` / `TCPRoute` — per-app routing in app namespaces
+- Gateway listeners:
+  - `http` (port 80) — redirects to HTTPS
+  - `https` (port 443) — TLS termination with wildcard cert
+  - Custom TCP ports as needed (e.g., syslog on 514/6514)
+- Route namespaces are controlled via `allowedRoutes.namespaces.selector`
 
 ### cert-manager (Azure DNS DNS-01)
 - Maintain 2 ClusterIssuers:
   - `letsencrypt-staging` (testing)
   - `letsencrypt-prod` (real)
-- Prefer wildcard certificates where it reduces operational load:
-  - `*.example.com` (and/or per zone/subdomain strategy)
+- Wildcard certificate (`*.rex5.ca`) issued once, stored in Key Vault via PushSecret
+- Apps retrieve the wildcard cert via ExternalSecret (no per-app cert issuance)
 
 ### External Secrets Operator (Azure Key Vault)
-- Define:
-  - `ClusterSecretStore` (or per-namespace SecretStores if you need isolation)
-- ExternalSecret resources live with the app in `apps/<app>/`.
+- ClusterSecretStores for each Key Vault:
+  - `azure-keyvault-store` — main platform vault
+  - `azure-keyvault-customerzone-store` — customer-zone vault (if applicable)
+- Uses Azure Workload Identity (no static credentials)
+- ExternalSecret resources live with the app in `apps/<app>/`
+
+### Authentik (SSO/IdP)
+- Provides OIDC authentication for internal applications
+- Blueprints define applications and providers as code
+- Apps configure OIDC via ExternalSecret for client credentials
 
 ---
 
@@ -411,9 +437,11 @@ kubectl logs <pod> -n <ns> --tail=200
 ```
 
 ### Controllers (common namespaces)
-- Traefik: `platform-traefik`
-- cert-manager: `platform-cert-manager`
-- external-secrets: `platform-external-secrets`
+- Traefik: `traefik`
+- cert-manager: `cert-manager`
+- external-secrets: `external-secrets`
+- Authentik: `authentik`
+- Monitoring: `monitoring`
 - ArgoCD: `argocd`
 
 ---
@@ -421,24 +449,25 @@ kubectl logs <pod> -n <ns> --tail=200
 ## "How to add a new app" (standard recipe)
 
 1. **Create namespace manifest** (if new):
-   - `platform/namespaces/apps-<app>.yaml`
-   - include Pod Security labels
-   - include base NetworkPolicies for ingress from Traefik + DNS egress
+   - `platform/namespaces/<app>.yaml`
+   - Include Pod Security Admission labels (restricted)
+   - Reference NetworkPolicy from `platform/policies/`
 
 2. **Add app folder:**
-   - `apps/<app>/values.yaml` (pinned versions)
-   - `apps/<app>/externalsecrets.yaml` (references to AKV)
-   - `apps/<app>/ingressroute.yaml` (Traefik CRD)
-   - optional `apps/<app>/middlewares.yaml`
+   - `apps/<app>/namespace.yaml` (if not using central namespaces)
+   - `apps/<app>/values.yaml` (Helm values, pinned versions)
+   - `apps/<app>/externalsecret.yaml` (references to AKV secrets)
+   - `apps/<app>/httproute.yaml` (Gateway API routing)
 
-3. **Add ArgoCD Application:**
-   - `argocd/apps/apps-<app>.yaml` pointing to `apps/<app>/`
+3. **Update Gateway allowedRoutes** (if needed):
+   - Add namespace to Gateway listener selector in `platform/traefik/gateway.yaml`
 
 4. **Validate:**
    - `helm template ...`
    - `kubeconform ...`
 
 5. **Commit + PR with checklist.**
+   - ArgoCD ApplicationSet will auto-discover the new app folder
 
 ---
 

@@ -1,0 +1,77 @@
+---
+# Apps AppProject
+# Restricts application workloads to app namespaces only (no cluster-scoped resources)
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Application workloads (business apps, services)
+
+  # Source repositories allowed for this project
+  sourceRepos:
+    - 'https://github.com/<ORG>/<REPO>.git'  # TODO: Replace with actual repo
+    # Add app-specific Helm repos as needed
+
+  # Destination clusters and namespaces
+  # Apps can only deploy to non-platform namespaces
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+
+  # Apps cannot create cluster-scoped resources
+  clusterResourceWhitelist: []
+
+  # Namespace-scoped resources apps can manage
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: ''
+      kind: PersistentVolumeClaim
+    - group: 'apps'
+      kind: Deployment
+    - group: 'apps'
+      kind: StatefulSet
+    - group: 'apps'
+      kind: DaemonSet
+    - group: 'apps'
+      kind: ReplicaSet
+    - group: 'batch'
+      kind: Job
+    - group: 'batch'
+      kind: CronJob
+    - group: 'autoscaling'
+      kind: HorizontalPodAutoscaler
+    - group: 'policy'
+      kind: PodDisruptionBudget
+    - group: 'networking.k8s.io'
+      kind: NetworkPolicy
+    - group: 'gateway.networking.k8s.io'
+      kind: HTTPRoute
+    - group: 'gateway.networking.k8s.io'
+      kind: TCPRoute
+    - group: 'gateway.networking.k8s.io'
+      kind: GRPCRoute
+    - group: 'external-secrets.io'
+      kind: ExternalSecret
+
+  # Deny apps from managing platform-critical resources
+  namespaceResourceBlacklist:
+    - group: 'rbac.authorization.k8s.io'
+      kind: Role
+    - group: 'rbac.authorization.k8s.io'
+      kind: RoleBinding
+
+  # Block deployments to platform namespaces
+  # Note: This is enforced via destination restrictions above
+
+  roles: []

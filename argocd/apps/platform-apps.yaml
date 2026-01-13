@@ -1,0 +1,113 @@
+---
+# Platform ApplicationSet
+# Manages all platform infrastructure components
+# Uses a list generator for explicit control over deployment order and config
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          # Shared resources (namespaces, storage classes, certificates)
+          - name: shared
+            path: platform/shared
+            namespace: shared
+            syncWave: "0"
+
+          # cert-manager (must come before components that need certs)
+          - name: cert-manager
+            path: platform/cert-manager
+            namespace: cert-manager
+            chart: cert-manager
+            repo: https://charts.jetstack.io
+            version: "v1.14.4"  # TODO: Update to latest stable
+            syncWave: "1"
+
+          # external-secrets (must come before apps that need secrets)
+          - name: external-secrets
+            path: platform/external-secrets
+            namespace: external-secrets
+            chart: external-secrets
+            repo: https://charts.external-secrets.io
+            version: "0.9.13"  # TODO: Update to latest stable
+            syncWave: "2"
+
+          # Traefik ingress controller
+          - name: traefik
+            path: platform/traefik
+            namespace: traefik
+            chart: traefik
+            repo: https://traefik.github.io/charts
+            version: "26.1.0"  # TODO: Update to latest stable
+            syncWave: "3"
+
+          # Authentik SSO/IdP
+          - name: authentik
+            path: platform/authentik
+            namespace: authentik
+            chart: authentik
+            repo: https://charts.goauthentik.io
+            version: "2024.2.0"  # TODO: Update to latest stable
+            syncWave: "4"
+
+          # Monitoring stack (Prometheus, Grafana)
+          - name: monitoring
+            path: platform/monitoring
+            namespace: monitoring
+            syncWave: "5"
+
+  template:
+    metadata:
+      name: 'platform-{{name}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: platform
+        app.kubernetes.io/component: '{{name}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{syncWave}}'
+    spec:
+      project: platform
+
+      # Source configuration
+      # For Helm charts: use chart repo
+      # For manifests: use git repo
+      source:
+        repoURL: https://github.com/<ORG>/<REPO>.git  # TODO: Replace with actual repo
+        targetRevision: HEAD
+        path: '{{path}}'
+        helm:
+          valueFiles:
+            - values.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+      # Ignore webhook CA bundle differences (managed by controllers)
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          jqPathExpressions:
+            - .webhooks[].clientConfig.caBundle
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+          jqPathExpressions:
+            - .webhooks[].clientConfig.caBundle

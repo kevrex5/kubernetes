@@ -1,0 +1,54 @@
+---
+# GatewayClass - defines Traefik as the Gateway API controller
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik
+spec:
+  controllerName: traefik.io/gateway-controller
+
+---
+# Shared Gateway - single entry point for all applications
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: traefik
+spec:
+  gatewayClassName: traefik
+
+  listeners:
+    # HTTP listener (for redirects to HTTPS)
+    - name: http
+      protocol: HTTP
+      port: 8000
+      hostname: "*.<DOMAIN>"  # TODO: Replace with your domain
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: gateway.networking.k8s.io/route-allowed
+                operator: In
+                values:
+                  - "true"
+
+    # HTTPS listener (TLS termination)
+    - name: https
+      protocol: HTTPS
+      port: 8443
+      hostname: "*.<DOMAIN>"  # TODO: Replace with your domain
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: gateway.networking.k8s.io/route-allowed
+                operator: In
+                values:
+                  - "true"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: wildcard-tls

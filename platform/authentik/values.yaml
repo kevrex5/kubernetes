@@ -1,0 +1,81 @@
+# Authentik Helm Values for AKS
+# Chart: https://charts.goauthentik.io
+# Version: Pin in ArgoCD ApplicationSet
+# Docs: https://docs.goauthentik.io/
+
+# Replicas
+replicas: 1
+
+# Azure Workload Identity (if using Azure Key Vault for secrets)
+# podAnnotations:
+#   azure.workload.identity/use: "true"
+
+# authentik configuration
+authentik:
+  # Secret key - MUST be set via ExternalSecret
+  secret_key: ""
+
+  # Error reporting (disable in production)
+  error_reporting:
+    enabled: false
+
+  # PostgreSQL configuration
+  postgresql:
+    host: authentik-postgresql
+    name: authentik
+    user: authentik
+    password: ""  # Set via ExternalSecret
+
+  # Redis configuration
+  redis:
+    host: authentik-redis-master
+
+# Server configuration
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Worker configuration
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# PostgreSQL subchart
+postgresql:
+  enabled: true
+  auth:
+    username: authentik
+    database: authentik
+    # Password set via existingSecret
+    existingSecret: authentik-secrets
+    secretKeys:
+      userPasswordKey: AUTHENTIK_POSTGRESQL__PASSWORD
+
+# Redis subchart
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+
+# Use existing secret for sensitive values
+# Create via ExternalSecret
+envFrom:
+  - secretRef:
+      name: authentik-secrets
+
+# Ingress (disabled - we use Gateway API HTTPRoute)
+ingress:
+  enabled: false

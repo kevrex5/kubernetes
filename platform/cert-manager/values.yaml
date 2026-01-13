@@ -1,0 +1,92 @@
+# cert-manager Helm Values for AKS with Azure DNS
+# Chart: https://charts.jetstack.io
+# Version: Pin in ArgoCD ApplicationSet
+
+# Install CRDs
+crds:
+  enabled: true
+
+# Enable Gateway API support
+extraArgs:
+  - --enable-gateway-api
+
+# Leader election namespace
+global:
+  leaderElection:
+    namespace: cert-manager
+
+# Azure Workload Identity labels
+podLabels:
+  azure.workload.identity/use: "true"
+
+# Service account with Workload Identity
+serviceAccount:
+  create: true
+  name: cert-manager
+  annotations:
+    # TODO: Replace with your managed identity client ID
+    azure.workload.identity/client-id: "<CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>"
+    azure.workload.identity/tenant-id: "<AZURE_TENANT_ID>"
+  labels:
+    azure.workload.identity/use: "true"
+
+# Resource limits
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Tolerations for critical workloads
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+# Webhook configuration
+webhook:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+# CA Injector configuration
+cainjector:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+# Startup API check
+startupapicheck:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
