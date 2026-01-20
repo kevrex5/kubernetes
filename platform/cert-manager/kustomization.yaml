@@ -3,8 +3,6 @@ kind: Kustomization
 
 resources:
   - clusterissuers.yaml
-  - wildcard-certificate.yaml
-  - pushsecret-wildcard.yaml
 
 # Values are handled via Helm in ArgoCD ApplicationSet
 # This kustomization manages additional resources
