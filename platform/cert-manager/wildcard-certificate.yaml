@@ -6,7 +6,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: wildcard-cert
-  namespace: rex5-cc-mz-k8s-shared
+  namespace: rex5-cc-mz-k8s-cert-manager
 spec:
   secretName: wildcard-tls
   issuerRef:
