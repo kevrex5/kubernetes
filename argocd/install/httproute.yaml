@@ -4,16 +4,16 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: argocd
-  namespace: argocd
+  namespace: rex5-cc-mz-k8s-argocd
   labels:
     app.kubernetes.io/name: argocd
 spec:
   parentRefs:
     - name: shared-gateway
-      namespace: traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: https
   hostnames:
-    - argocd.<DOMAIN>  # TODO: Replace
+    - argocd.rex5.ca
   rules:
     - matches:
         - path:
@@ -29,7 +29,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: argocd-http-redirect
-  namespace: argocd
+  namespace: rex5-cc-mz-k8s-argocd
   labels:
     app.kubernetes.io/name: argocd
 spec:
@@ -38,7 +38,7 @@ spec:
       namespace: traefik
       sectionName: http
   hostnames:
-    - argocd.<DOMAIN>  # TODO: Replace
+    - argocd.rex5.ca
   rules:
     - filters:
         - type: RequestRedirect

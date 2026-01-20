@@ -53,9 +53,13 @@ apps/
   <app-name>/             # One folder per app (Helm values + HTTPRoute)
 
 environments/
-  prod/                   # One cluster => prod overlay for the real cluster
-    platform/
-    apps/
+  prod/                   # Production environment configuration
+    config.yaml           # Centralized environment values (SINGLE SOURCE OF TRUTH)
+    platform/             # Environment-specific platform overrides (if needed)
+    apps/                 # Environment-specific app overrides (if needed)
+
+scripts/
+  apply-config.sh         # Script to apply environment config to manifests
 
 docs/
 
@@ -64,6 +68,55 @@ logs/
   prompts/
   problems/
   commits/
+```
+
+---
+
+## Environment Configuration (Centralized Values)
+
+All environment-specific values (domains, Azure resource IDs, managed identities, etc.) are defined in a **single configuration file**:
+
+```
+environments/<env>/config.yaml
+```
+
+### Why centralized configuration?
+
+1. **Single source of truth** — Change a value once, it applies everywhere
+2. **Environment portability** — Easy to add staging/dev by copying config.yaml
+3. **Clear audit trail** — Git history shows exactly when/why config changed
+4. **No scattered placeholders** — All environment values in one place
+
+### Configuration file structure
+
+```yaml
+# environments/prod/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-config
+  annotations:
+    config.kubernetes.io/local-config: "true"  # Not applied to cluster
+data:
+  DOMAIN: "rex5.ca"
+  AZURE_SUBSCRIPTION_ID: "..."
+  AZURE_TENANT_ID: "..."
+  KEYVAULT_NAME: "..."
+  # ... all environment values
+```
+
+### How to use
+
+1. **Edit config** — Update `environments/prod/config.yaml`
+2. **Apply to manifests** — Run `./scripts/apply-config.sh prod`
+3. **Commit & push** — ArgoCD syncs the changes
+
+### Adding a new environment
+
+```bash
+cp -r environments/prod environments/staging
+# Edit environments/staging/config.yaml with staging values
+./scripts/apply-config.sh staging
 ```
 
 ---

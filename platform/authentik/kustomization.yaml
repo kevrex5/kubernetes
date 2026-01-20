@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - httproute.yaml
+  - externalsecret.yaml
+
+# Values are handled via Helm in ArgoCD ApplicationSet
+# This kustomization manages additional resources

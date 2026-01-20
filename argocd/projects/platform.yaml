@@ -5,7 +5,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: platform
-  namespace: argocd
+  namespace: rex5-cc-mz-k8s-argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -13,7 +13,7 @@ spec:
 
   # Source repositories allowed for this project
   sourceRepos:
-    - 'https://github.com/<ORG>/<REPO>.git'  # TODO: Replace with actual repo
+    - 'https://github.com/kevrex5/kubernetes.git'
     - 'https://charts.jetstack.io'            # cert-manager
     - 'https://charts.external-secrets.io'    # external-secrets
     - 'https://traefik.github.io/charts'      # traefik
@@ -23,20 +23,20 @@ spec:
   # Destination clusters and namespaces
   destinations:
     # Platform namespaces
-    - namespace: traefik
+    - namespace: rex5-cc-mz-k8s-traefik
       server: https://kubernetes.default.svc
-    - namespace: cert-manager
+    - namespace: rex5-cc-mz-k8s-cert-manager
       server: https://kubernetes.default.svc
-    - namespace: external-secrets
+    - namespace: rex5-cc-mz-k8s-external-secrets
       server: https://kubernetes.default.svc
-    - namespace: authentik
+    - namespace: rex5-cc-mz-k8s-authentik
       server: https://kubernetes.default.svc
-    - namespace: monitoring
+    - namespace: rex5-cc-mz-k8s-monitoring
       server: https://kubernetes.default.svc
-    - namespace: shared
+    - namespace: rex5-cc-mz-k8s-shared
       server: https://kubernetes.default.svc
     # ArgoCD namespace (for self-management)
-    - namespace: argocd
+    - namespace: rex5-cc-mz-k8s-argocd
       server: https://kubernetes.default.svc
 
   # Cluster-scoped resources platform apps can manage

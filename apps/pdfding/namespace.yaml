@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: pdfding
+  name: rex5-cc-mz-k8s-pdfding
   labels:
     app.kubernetes.io/name: pdfding
     app.kubernetes.io/component: document-processing

@@ -46,12 +46,12 @@ service:
   type: LoadBalancer
   externalTrafficPolicy: Local
   annotations:
-    # TODO: Replace with your Azure resource group and PIP name
-    service.beta.kubernetes.io/azure-load-balancer-resource-group: "<PUBLICIP_RESOURCE_GROUP>"
-    service.beta.kubernetes.io/azure-pip-name: "<PUBLICIP_NAME>"
-    service.beta.kubernetes.io/azure-load-balancer-ipv4: "<PUBLICIP_ADDRESS>"
+  
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "rex5-cc-mz-prod-publicip-rg"
+    service.beta.kubernetes.io/azure-pip-name: "rex5-cc-mz-prod-pip"
+    service.beta.kubernetes.io/azure-load-balancer-ipv4: "4.204.154.192"
   spec:
-    loadBalancerIP: "<PUBLICIP_ADDRESS>"
+    loadBalancerIP: "4.204.154.192"
   # Restrict access by source IP (optional)
   # loadBalancerSourceRanges:
   #   - 0.0.0.0/0

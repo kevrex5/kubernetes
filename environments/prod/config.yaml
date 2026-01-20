@@ -1,0 +1,88 @@
+# =============================================================================
+# Centralized Environment Configuration - Production
+# =============================================================================
+# This file contains all environment-specific values for the production cluster.
+# All platform and application manifests reference these values via Kustomize
+# replacements or direct inclusion.
+#
+# To add a new environment, copy this file to environments/<env>/config.yaml
+# and update the values accordingly.
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-config
+  namespace: default
+  annotations:
+    config.kubernetes.io/local-config: "true"  # Prevents this from being applied to cluster
+data:
+  # ---------------------------------------------------------------------------
+  # Domain Configuration
+  # ---------------------------------------------------------------------------
+  DOMAIN: "rex5.ca"
+  WILDCARD_DOMAIN: "*.rex5.ca"
+  
+  # ---------------------------------------------------------------------------
+  # Git Repository
+  # ---------------------------------------------------------------------------
+  GIT_REPO_URL: "https://github.com/kevrex5/kubernetes.git"
+  GIT_REPO_BRANCH: "main"
+  
+  # ---------------------------------------------------------------------------
+  # Azure Subscription & Tenant
+  # ---------------------------------------------------------------------------
+  AZURE_SUBSCRIPTION_ID: "ed4abb65-42ea-480a-a53c-aeeb0a09eeb6"
+  AZURE_TENANT_ID: "14021cba-cdc0-4c87-a145-b66f94b7017f"
+  
+  # ---------------------------------------------------------------------------
+  # Azure Key Vault
+  # ---------------------------------------------------------------------------
+  KEYVAULT_NAME: "rex5-cc-mz-prod-kv"
+  KEYVAULT_RESOURCE_GROUP: "rex5-cc-mz-prod-keyvault-rg"
+  KEYVAULT_URL: "https://rex5-cc-mz-prod-kv.vault.azure.net/"
+  
+  # ---------------------------------------------------------------------------
+  # Azure DNS Zone (for cert-manager ACME DNS-01)
+  # ---------------------------------------------------------------------------
+  DNS_ZONE_NAME: "rex5.ca"
+  DNS_ZONE_RESOURCE_GROUP: "rex5-cc-mz-prod-dns-rg"
+  
+  # ---------------------------------------------------------------------------
+  # Azure Public IP (for Traefik LoadBalancer)
+  # ---------------------------------------------------------------------------
+  PUBLICIP_ADDRESS: "4.204.154.192"
+  PUBLICIP_NAME: "rex5-cc-mz-prod-pip"
+  PUBLICIP_RESOURCE_GROUP: "rex5-cc-mz-prod-publicip-rg"
+  
+  # ---------------------------------------------------------------------------
+  # Managed Identities (Workload Identity)
+  # ---------------------------------------------------------------------------
+  # cert-manager: DNS-01 challenge solver
+  CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID: "08d54073-58ed-434a-b351-8c87a17a775a"
+  
+  # external-secrets: Key Vault access
+  # TODO: Create dedicated managed identity for ESO with Key Vault permissions
+  # For now, using the Azure Key Vault Secrets Provider identity
+  ESO_MANAGED_IDENTITY_CLIENT_ID: "fb490184-8428-4070-a031-6f894286150a"
+  
+  # ---------------------------------------------------------------------------
+  # AKS Cluster
+  # ---------------------------------------------------------------------------
+  AKS_CLUSTER_NAME: "rex5-cc-mz-prod-aks"
+  AKS_RESOURCE_GROUP: "rex5-cc-mz-prod-aks-rg"
+  AKS_NODE_RESOURCE_GROUP: "MC_rex5-cc-mz-prod-aks-rg_rex5-cc-mz-prod-aks_canadacentral"
+  
+  # ---------------------------------------------------------------------------
+  # Contact Information
+  # ---------------------------------------------------------------------------
+  ADMIN_EMAIL: "admin@rex5.ca"
+  
+  # ---------------------------------------------------------------------------
+  # Service Hostnames (derived from DOMAIN)
+  # ---------------------------------------------------------------------------
+  ARGOCD_HOST: "argocd.rex5.ca"
+  GRAFANA_HOST: "grafana.rex5.ca"
+  PROMETHEUS_HOST: "prometheus.rex5.ca"
+  ALERTMANAGER_HOST: "alertmanager.rex5.ca"
+  AUTHENTIK_HOST: "auth.rex5.ca"

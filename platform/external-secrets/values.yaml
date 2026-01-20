@@ -23,9 +23,9 @@ serviceAccount:
   create: true
   name: external-secrets
   annotations:
-    # TODO: Replace with your managed identity client ID
-    azure.workload.identity/client-id: "<ESO_MANAGED_IDENTITY_CLIENT_ID>"
-    azure.workload.identity/tenant-id: "<AZURE_TENANT_ID>"
+  
+    azure.workload.identity/client-id: "fb490184-8428-4070-a031-6f894286150a"
+    azure.workload.identity/tenant-id: "14021cba-cdc0-4c87-a145-b66f94b7017f"
   labels:
     azure.workload.identity/use: "true"
 

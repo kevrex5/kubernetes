@@ -1,0 +1,58 @@
+---
+# NetworkPolicies for Traefik namespace
+# Traefik needs to accept traffic from external and route to app namespaces
+
+# Allow all ingress (Traefik is the entry point)
+# Note: External access is controlled at Azure NSG / LB level
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-ingress
+  namespace: rex5-cc-mz-k8s-traefik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}  # Allow from anywhere
+
+---
+# Allow DNS egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: rex5-cc-mz-k8s-traefik
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Allow Traefik to route to backend services in all namespaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: traefik-backend-egress
+  namespace: rex5-cc-mz-k8s-traefik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes:
+    - Egress
+  egress:
+    # Allow routing to any pod (Traefik needs to reach backends)
+    - {}

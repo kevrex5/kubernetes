@@ -5,7 +5,26 @@
 
 # Global settings
 global:
-  domain: argocd.<DOMAIN>  # TODO: Replace
+  domain: argocd.rex5.ca
+
+  # Tolerate spot nodes (required for AKS spot node pools)
+  tolerations:
+    - key: "kubernetes.azure.com/scalesetpriority"
+      operator: "Equal"
+      value: "spot"
+      effect: "NoSchedule"
+
+  # Prefer spot nodes for cost optimization
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "kubernetes.azure.com/scalesetpriority"
+                operator: In
+                values:
+                  - "spot"
 
 # Server configuration
 server:
@@ -68,7 +87,7 @@ configs:
 
   cm:
     # URL for ArgoCD
-    url: https://argocd.<DOMAIN>  # TODO: Replace
+    url: https://argocd.rex5.ca
 
     # Enable status badge
     statusbadge.enabled: true

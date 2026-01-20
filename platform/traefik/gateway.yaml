@@ -13,7 +13,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: shared-gateway
-  namespace: traefik
+  namespace: rex5-cc-mz-k8s-traefik
 spec:
   gatewayClassName: traefik
 
@@ -22,7 +22,7 @@ spec:
     - name: http
       protocol: HTTP
       port: 8000
-      hostname: "*.<DOMAIN>"  # TODO: Replace with your domain
+      hostname: "*.rex5.ca"
       allowedRoutes:
         namespaces:
           from: Selector
@@ -37,7 +37,7 @@ spec:
     - name: https
       protocol: HTTPS
       port: 8443
-      hostname: "*.<DOMAIN>"  # TODO: Replace with your domain
+      hostname: "*.rex5.ca"
       allowedRoutes:
         namespaces:
           from: Selector

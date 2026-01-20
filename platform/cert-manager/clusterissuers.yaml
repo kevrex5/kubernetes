@@ -7,18 +7,18 @@ metadata:
 spec:
   acme:
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: <ADMIN_EMAIL>  # TODO: Replace with your email
+    email: admin@rex5.ca
     privateKeySecretRef:
       name: letsencrypt-staging
     solvers:
       - dns01:
           azureDNS:
-            subscriptionID: <SUBSCRIPTION_ID>  # TODO: Replace
-            resourceGroupName: <DNS_ZONE_RESOURCE_GROUP>  # TODO: Replace
-            hostedZoneName: <DOMAIN>  # TODO: Replace (e.g., rex5.ca)
+            subscriptionID: ed4abb65-42ea-480a-a53c-aeeb0a09eeb6
+            resourceGroupName: rex5-cc-mz-prod-dns-rg
+            hostedZoneName: rex5.ca
             environment: AzurePublicCloud
             managedIdentity:
-              clientID: <CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>  # TODO: Replace
+              clientID: 08d54073-58ed-434a-b351-8c87a17a775a
 
 ---
 # ClusterIssuer - Let's Encrypt Production (for real certificates)
@@ -29,15 +29,15 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: <ADMIN_EMAIL>  # TODO: Replace with your email
+    email: admin@rex5.ca
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
       - dns01:
           azureDNS:
-            subscriptionID: <SUBSCRIPTION_ID>  # TODO: Replace
-            resourceGroupName: <DNS_ZONE_RESOURCE_GROUP>  # TODO: Replace
-            hostedZoneName: <DOMAIN>  # TODO: Replace (e.g., rex5.ca)
+            subscriptionID: ed4abb65-42ea-480a-a53c-aeeb0a09eeb6
+            resourceGroupName: rex5-cc-mz-prod-dns-rg
+            hostedZoneName: rex5.ca
             environment: AzurePublicCloud
             managedIdentity:
-              clientID: <CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>  # TODO: Replace
+              clientID: 08d54073-58ed-434a-b351-8c87a17a775a

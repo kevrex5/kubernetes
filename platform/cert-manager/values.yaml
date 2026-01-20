@@ -24,9 +24,9 @@ serviceAccount:
   create: true
   name: cert-manager
   annotations:
-    # TODO: Replace with your managed identity client ID
-    azure.workload.identity/client-id: "<CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>"
-    azure.workload.identity/tenant-id: "<AZURE_TENANT_ID>"
+  
+    azure.workload.identity/client-id: "08d54073-58ed-434a-b351-8c87a17a775a"
+    azure.workload.identity/tenant-id: "14021cba-cdc0-4c87-a145-b66f94b7017f"
   labels:
     azure.workload.identity/use: "true"
 

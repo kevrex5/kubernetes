@@ -16,7 +16,7 @@ image:
 
 pdfding:
   config:
-    hostName: "pdf.<DOMAIN>"  # TODO: Replace
+    hostName: "pdf.rex5.ca"
     hostPort: "8000"
     defaultTheme: "dark"
     defaultThemeColor: "blue"
@@ -41,7 +41,7 @@ pdfding:
       enabled: true
       clientId: "placeholder"  # Overridden by existingSecret
       clientSecret: "placeholder"  # Overridden by existingSecret
-      authUrl: "https://auth.<DOMAIN>/application/o/pdfding/.well-known/openid-configuration"
+      authUrl: "https://auth.rex5.ca/application/o/pdfding/.well-known/openid-configuration"
       oidc_only:
         enabled: false
       providerName: "Authentik"
