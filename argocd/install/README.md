@@ -62,7 +62,7 @@ helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update
 
 # 2. Create namespace
-kubectl create namespace argocd
+kubectl create namespace rex5-cc-mz-k8s-argocd
 
 # 3. Install ArgoCD with values
 helm install argocd argo/argo-cd -n rex5-cc-mz-k8s-argocd -f values.yaml

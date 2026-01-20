@@ -18,7 +18,7 @@ helm repo add traefik https://traefik.github.io/charts
 helm repo update
 
 # 2. Create namespace
-kubectl apply -f ../../namespaces/traefik.yaml
+kubectl apply -f ../../namespaces/kustomization.yaml
 
 # 3. Install Traefik with values
 helm install traefik traefik/traefik -n rex5-cc-mz-k8s-traefik -f values.yaml --timeout 10m
@@ -54,7 +54,7 @@ These are applied via the kustomization in `platform/traefik/`.
 
 ### Gateway API
 - Uses Kubernetes Gateway API (not IngressRoute CRDs)
-- Shared Gateway in `traefik` namespace
+- Shared Gateway in `rex5-cc-mz-k8s-traefik` namespace
 - Cross-namespace routing via `allowedRoutes` selector
 
 ### TLS

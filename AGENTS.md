@@ -124,10 +124,10 @@ cp -r environments/prod environments/staging
 ## Cluster model (one cluster)
 
 - Single AKS cluster.
-- Namespaces separate **platform** vs **apps**.
+- Namespaces separate **platform** vs **apps** using `rex5-cc-mz-k8s-<component>` naming convention.
 - Traefik is the **only** public entrypoint (Service type LoadBalancer).
 - Apps use **Kubernetes Gateway API** (`HTTPRoute`, `TCPRoute`, `GRPCRoute`).
-- A shared `Gateway` resource in `platform-traefik` namespace handles all routing.
+- A shared `Gateway` resource in `rex5-cc-mz-k8s-traefik` namespace handles all routing.
 - TLS is issued by **cert-manager** using **Azure DNS DNS-01**.
 - Wildcard certificate (`*.rex5.ca`) is stored in Azure Key Vault and distributed via ESO.
 - Secrets are delivered via **External Secrets Operator** from **Azure Key Vault**.
@@ -192,20 +192,24 @@ Order matters (CRDs + dependencies):
 
 2. Install ArgoCD (manual once, then GitOps takes over):
    - Create namespace:
-     - `kubectl create namespace argocd`
-   - Install ArgoCD (preferred: official manifests pinned to a version you approve)
-   - Expose ArgoCD access (port-forward or internal ingress later)
+     - `kubectl create namespace rex5-cc-mz-k8s-argocd`
+   - Install ArgoCD via Helm:
+     - `helm repo add argo https://argoproj.github.io/argo-helm`
+     - `helm install argocd argo/argo-cd -n rex5-cc-mz-k8s-argocd -f argocd/install/values.yaml`
+   - Configure SSH credentials for Git access (see argocd/install/README.md)
 
-3. Apply ArgoCD root apps (app-of-apps):
-   - `kubectl apply -f argocd/apps/root-platform.yaml`
-   - `kubectl apply -f argocd/apps/root-apps.yaml`
+3. Apply ArgoCD AppProjects and root app (app-of-apps):
+   - `kubectl apply -f argocd/projects/platform.yaml`
+   - `kubectl apply -f argocd/projects/apps.yaml`
+   - `kubectl apply -f argocd/apps/root.yaml`
 
-4. ArgoCD sync brings up:
-   - namespaces + policies
-   - cert-manager
-   - external-secrets
-   - traefik
-   - then app workloads
+4. ArgoCD sync brings up (via sync waves):
+   - Wave -1: namespaces
+   - Wave 0: shared resources
+   - Wave 1: cert-manager (v1.17.1)
+   - Wave 2: external-secrets (v0.17.0)
+   - Wave 3: traefik
+   - Wave 4+: authentik, monitoring, app workloads
 
 Record bootstrap commands and outcomes in:
 - `logs/commands/YYYY-MM-DD.md`
@@ -254,12 +258,48 @@ If ArgoCD is blocked (rare):
 1) **Pin Helm chart versions.**  
 No floating latest tags for platform dependencies.
 
+**Current versions:**
+- cert-manager: v1.17.1
+- external-secrets: v0.17.0 (supports v1 API)
+- traefik: v3.2.0
+
 2) **Pin container image tags** for critical workloads.  
 Prefer semver tags. Use digests for high-risk components if needed.
 
 3) **ArgoCD revisions**
 - Production should track a tagged release or a protected branch strategy.
 - If tracking `main` for prod, it must be explicitly documented in an ADR.
+
+---
+
+## Common Pitfalls & Solutions
+
+### AppProject Configuration
+**Issue**: Applications fail with "not permitted in project" errors  
+**Solution**: Ensure AppProject includes:
+- Both HTTPS and SSH Git URLs in `sourceRepos`
+- `default` namespace in destinations (for namespace creation)
+- RBAC cluster resources in `clusterResourceWhitelist` (ClusterRole, ClusterRoleBinding)
+
+### Kustomization Files
+**Issue**: ArgoCD tries to apply kustomization.yaml as CRD  
+**Solution**: Exclude from directory sources: `exclude: '{values.yaml,kustomization.yaml}'`
+
+### External Secrets API Version
+**Issue**: Pods crash with "no matches for kind ExternalSecret in version external-secrets.io/v1beta1"  
+**Solution**: Use external-secrets v0.17.0+ which supports v1 API
+
+### cert-manager Leader Election
+**Issue**: RBAC errors for resources in wrong namespace  
+**Solution**: Set `global.leaderElection.namespace` to match deployment namespace (rex5-cc-mz-k8s-cert-manager)
+
+### Git Authentication
+**Issue**: ArgoCD can't clone repository via SSH  
+**Solution**: 
+- Store SSH private key in Key Vault
+- Create secret with labels: `argocd.argoproj.io/secret-type=repository`
+- Include: `type=git`, `url=git@github.com:<org>/<repo>.git`, `insecure=true`, `sshPrivateKey`
+- Restart repo-server pods after secret updates
 
 ---
 
@@ -270,18 +310,33 @@ Prefer semver tags. Use digests for high-risk components if needed.
 - Business apps belong to an apps AppProject.
 - Projects restrict:
   - allowed destinations (cluster/namespaces)
-  - allowed source repos
+  - allowed source repos (must include both HTTPS and SSH Git URLs)
   - cluster resource permissions
 
-### Root apps
-- `argocd/apps/root-platform.yaml` owns everything under `platform/`
-- `argocd/apps/root-apps.yaml` owns everything under `apps/`
+**Critical AppProject configurations**:
+- Include `default` namespace in destinations for namespace creation
+- Add RBAC cluster resources to `clusterResourceWhitelist`:
+  - `rbac.authorization.k8s.io/ClusterRole`
+  - `rbac.authorization.k8s.io/ClusterRoleBinding`
+- Support both Git URL formats in `sourceRepos`:
+  - `https://github.com/<org>/<repo>.git`
+  - `git@github.com:<org>/<repo>.git`
 
-Keep Argo apps small and logical:
-- `platform-traefik`
-- `platform-cert-manager`
-- `platform-external-secrets`
-- `apps-<appname>`
+### Root apps
+- `argocd/apps/root.yaml` — Single root Application that creates:
+  - `platform-apps` — All platform infrastructure Applications
+  - `workload-apps` — ApplicationSet for auto-discovering apps
+
+### Application naming
+- Platform: `platform-<component>` (e.g., `platform-traefik`, `platform-cert-manager`)
+- Workloads: Discovered from `apps/<appname>/` directories
+
+### Multi-source Applications
+- Platform apps use multi-source pattern:
+  1. Helm chart from upstream repo
+  2. Git values file reference (`$values/platform/<component>/values.yaml`)
+  3. Additional manifests from Git (ClusterIssuers, HTTPRoutes, etc.)
+- **Important**: Exclude `kustomization.yaml` from directory sources to prevent CRD conflicts
 
 ---
 
@@ -291,7 +346,7 @@ Keep Argo apps small and logical:
 - Use **Kubernetes Gateway API** for routing (not IngressRoute CRDs).
 - Resources:
   - `GatewayClass` — defines Traefik as the controller
-  - `Gateway` — shared gateway in `platform-traefik` namespace
+  - `Gateway` — shared gateway in `rex5-cc-mz-k8s-traefik` namespace
   - `HTTPRoute` / `TCPRoute` — per-app routing in app namespaces
 - Gateway listeners:
   - `http` (port 80) — redirects to HTTPS
@@ -490,12 +545,13 @@ kubectl logs <pod> -n <ns> --tail=200
 ```
 
 ### Controllers (common namespaces)
-- Traefik: `traefik`
-- cert-manager: `cert-manager`
-- external-secrets: `external-secrets`
-- Authentik: `authentik`
-- Monitoring: `monitoring`
-- ArgoCD: `argocd`
+- ArgoCD: `rex5-cc-mz-k8s-argocd`
+- Traefik: `rex5-cc-mz-k8s-traefik`
+- cert-manager: `rex5-cc-mz-k8s-cert-manager`
+- external-secrets: `rex5-cc-mz-k8s-external-secrets`
+- Authentik: `rex5-cc-mz-k8s-authentik`
+- Monitoring: `rex5-cc-mz-k8s-monitoring`
+- Shared: `rex5-cc-mz-k8s-shared`
 
 ---
 
@@ -574,14 +630,14 @@ A change is done only when:
 > These are identified best practices to implement **after** the basic stack is operational.
 
 ### Phase 2: ArgoCD Hardening
-- [ ] **Sync waves and hooks** — Order dependencies (CRDs before CRs, namespaces before workloads)
-- [ ] **Pruning policy** — Define `automated.prune` vs manual pruning strategy
-- [ ] **Self-heal policy** — Document drift auto-correction behavior
+- [x] **Sync waves and hooks** — Implemented with waves -1 to 5 for dependency ordering
+- [x] **Pruning policy** — Automated pruning enabled (`automated.prune: true`)
+- [x] **Self-heal policy** — Automated self-heal enabled (`automated.selfHeal: true`)
+- [x] **ApplicationSets** — Implemented for workload apps (auto-discovery from `apps/`)
 - [ ] **ArgoCD RBAC** — Define user/group permissions for ArgoCD UI/CLI
 - [ ] **Notifications** — Slack/PagerDuty alerts on sync failures
-- [ ] **ApplicationSets** — Migrate from manual app manifests for scalability
 - [ ] **Sync windows** — Define production change windows (e.g., no syncs during business hours)
-- [ ] **Custom health checks** — ArgoCD resource health for CRDs (IngressRoute, Certificate, ExternalSecret)
+- [ ] **Custom health checks** — ArgoCD resource health for CRDs (HTTPRoute, Certificate, ExternalSecret)
 
 ### Phase 3: Observability
 - [ ] **Metrics** — Prometheus + Grafana (or Azure Monitor for managed experience)
