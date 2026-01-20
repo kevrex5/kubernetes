@@ -7,7 +7,7 @@ metadata:
   name: apps
   namespace: rex5-cc-mz-k8s-argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    - argoproj.io/finalizer
 spec:
   description: Application workloads (business apps, services)
 

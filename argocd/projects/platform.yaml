@@ -7,7 +7,7 @@ metadata:
   name: platform
   namespace: rex5-cc-mz-k8s-argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    - argoproj.io/finalizer
 spec:
   description: Core platform infrastructure (traefik, cert-manager, external-secrets, etc.)
 
