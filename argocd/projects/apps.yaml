@@ -14,6 +14,7 @@ spec:
   # Source repositories allowed for this project
   sourceRepos:
     - 'https://github.com/kevrex5/kubernetes.git'
+    - 'git@github.com:kevrex5/kubernetes.git'
     # Add app-specific Helm repos as needed
 
   # Destination clusters and namespaces
