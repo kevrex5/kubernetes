@@ -107,7 +107,7 @@ spec:
       targetRevision: HEAD
       path: platform/cert-manager
       directory:
-        exclude: 'values.yaml'
+        exclude: '{values.yaml,kustomization.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: rex5-cc-mz-k8s-cert-manager
@@ -166,7 +166,7 @@ spec:
       targetRevision: HEAD
       path: platform/external-secrets
       directory:
-        exclude: 'values.yaml'
+        exclude: '{values.yaml,kustomization.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: rex5-cc-mz-k8s-external-secrets
@@ -225,7 +225,7 @@ spec:
       targetRevision: HEAD
       path: platform/traefik
       directory:
-        exclude: 'values.yaml'
+        exclude: '{values.yaml,kustomization.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: rex5-cc-mz-k8s-traefik
@@ -275,7 +275,7 @@ spec:
       targetRevision: HEAD
       path: platform/authentik
       directory:
-        exclude: 'values.yaml'
+        exclude: '{values.yaml,kustomization.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: rex5-cc-mz-k8s-authentik
