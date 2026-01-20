@@ -40,42 +40,6 @@ spec:
 
 ---
 # ============================================================================
-# Shared Resources (sync wave 0)
-# ============================================================================
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: platform-shared
-  namespace: rex5-cc-mz-k8s-argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: platform
-  source:
-    repoURL: git@github.com:kevrex5/kubernetes.git
-    targetRevision: HEAD
-    path: platform/shared
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-k8s-shared
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-
----
-# ============================================================================
 # cert-manager (sync wave 1 - needed for certificates)
 # Uses multi-source: Helm chart + Git repo for additional resources
 # ============================================================================
