@@ -153,7 +153,7 @@ spec:
     # Helm chart
     - repoURL: https://charts.external-secrets.io
       chart: external-secrets
-      targetRevision: 0.14.3  # Pinned version
+      targetRevision: 0.17.0  # Updated to support v1 API
       helm:
         valueFiles:
           - $values/platform/external-secrets/values.yaml
