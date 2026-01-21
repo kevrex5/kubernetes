@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: authentik
 spec:
   parentRefs:
-    - name: shared-gateway
+    - name: traefik-gateway
       namespace: rex5-cc-mz-k8s-traefik
       sectionName: https
   hostnames:
@@ -34,8 +34,8 @@ metadata:
     app.kubernetes.io/name: authentik
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: traefik
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: http
   hostnames:
     - auth.rex5.ca

@@ -10,8 +10,8 @@ metadata:
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: traefik
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: https
   hostnames:
     - grafana.rex5.ca
@@ -36,8 +36,8 @@ metadata:
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
-    - name: shared-gateway
-      namespace: traefik
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: http
   hostnames:
     - grafana.rex5.ca
