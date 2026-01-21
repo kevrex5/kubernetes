@@ -53,6 +53,8 @@ spec:
       kind: ClusterSecretStore
     - group: 'gateway.networking.k8s.io'
       kind: GatewayClass
+    - group: 'networking.k8s.io'
+      kind: IngressClass
     - group: 'storage.k8s.io'
       kind: StorageClass
     - group: 'admissionregistration.k8s.io'
