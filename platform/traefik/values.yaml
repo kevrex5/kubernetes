@@ -124,12 +124,12 @@ providers:
     enabled: true
     experimentalChannel: true
 
-# Disable built-in gateway (we define our own)
+# Enable built-in gateway (managed by Helm)
 gateway:
-  enabled: false
+  enabled: true
 
 gatewayClass:
-  enabled: false
+  enabled: true
 
 # Logging
 logs:
