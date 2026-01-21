@@ -176,7 +176,7 @@ spec:
     # Helm chart
     - repoURL: https://traefik.github.io/charts
       chart: traefik
-      targetRevision: 35.0.0  # Pinned version
+      targetRevision: 38.0.2  # Pinned version
       helm:
         valueFiles:
           - $values/platform/traefik/values.yaml
