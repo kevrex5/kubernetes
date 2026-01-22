@@ -12,7 +12,7 @@ authentik:
   error_reporting:
     enabled: false
   postgresql:
-    host: "authentik-postgresql"
+    host: "platform-authentik-postgresql"
     name: "authentik"
     user: "authentik"
     # Note: password will be read from AUTHENTIK_POSTGRESQL__PASSWORD env var in authentik-secrets
