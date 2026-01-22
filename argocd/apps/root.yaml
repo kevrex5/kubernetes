@@ -16,6 +16,9 @@ spec:
     repoURL: git@github.com:kevrex5/kubernetes.git
     targetRevision: HEAD  # TODO: Pin to tag/branch for production
     path: argocd/apps
+    directory:
+      recurse: false
+      exclude: 'root.yaml'
 
   destination:
     server: https://kubernetes.default.svc
