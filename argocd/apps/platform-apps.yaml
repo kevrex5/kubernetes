@@ -3,40 +3,40 @@
 # Manages all platform infrastructure components
 # Uses individual Applications for explicit control over Helm vs Kustomize
 
-# ============================================================================
-# Namespaces (must be first - sync wave -1)
-# ============================================================================
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: platform-namespaces
-  namespace: rex5-cc-mz-prod-argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: platform
-  source:
-    repoURL: git@github.com:kevrex5/kubernetes.git
-    targetRevision: HEAD
-    path: platform/namespaces
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
+# # ============================================================================
+# # Namespaces - DISABLED (using CreateNamespace=true per application)
+# # ============================================================================
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: platform-namespaces
+#   namespace: rex5-cc-mz-prod-argocd
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "-1"
+#   finalizers:
+#     - resources-finalizer.argocd.argoproj.io
+# spec:
+#   project: platform
+#   source:
+#     repoURL: git@github.com:kevrex5/kubernetes.git
+#     targetRevision: HEAD
+#     path: platform/namespaces
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: default
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#       - CreateNamespace=false
+#       - ServerSideApply=true
+#     retry:
+#       limit: 5
+#       backoff:
+#         duration: 5s
+#         factor: 2
+#         maxDuration: 3m
 
 # ---
 # # ============================================================================
@@ -138,7 +138,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - ServerSideApply=true
     retry:
       limit: 5
@@ -197,7 +197,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - ServerSideApply=true
     retry:
       limit: 5
