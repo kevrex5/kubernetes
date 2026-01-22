@@ -51,9 +51,8 @@ service:
   type: LoadBalancer
   externalTrafficPolicy: Local
   annotations:
-  
-    service.beta.kubernetes.io/azure-load-balancer-resource-group: "rex5-cc-mz-k8s-publicip-rg"
-    service.beta.kubernetes.io/azure-pip-name: "rex5-cc-mz-k8s-pip"
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "rex5-cc-mz-prod-publicip-rg"
+    service.beta.kubernetes.io/azure-pip-name: "rex5-cc-mz-prod-pip"
     service.beta.kubernetes.io/azure-load-balancer-ipv4: "4.204.154.192"
   spec:
     loadBalancerIP: "4.204.154.192"
@@ -127,6 +126,18 @@ providers:
 # Enable built-in gateway (managed by Helm)
 gateway:
   enabled: true
+  listeners:
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy: All  # Allow routes from all namespaces
+    websecure:
+      port: 8443
+      protocol: HTTPS
+      namespacePolicy: All  # Allow routes from all namespaces
+      certificateRefs:
+        - name: wildcard-tls
+          kind: Secret
 
 gatewayClass:
   enabled: true
