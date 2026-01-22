@@ -38,65 +38,64 @@ spec:
         factor: 2
         maxDuration: 3m
 
----
-# ============================================================================
-# cert-manager (sync wave 1 - needed for certificates)
-# Uses multi-source: Helm chart + Git repo for additional resources
-# ============================================================================
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: platform-cert-manager
-  namespace: rex5-cc-mz-k8s-argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: platform
-  sources:
-    # Helm chart
-    - repoURL: https://charts.jetstack.io
-      chart: cert-manager
-      targetRevision: v1.17.1  # Pinned version
-      helm:
-        valueFiles:
-          - $values/platform/cert-manager/values.yaml
-    # Values and additional resources from Git
-    - repoURL: git@github.com:kevrex5/kubernetes.git
-      targetRevision: HEAD
-      ref: values
-    # ClusterIssuers and other resources
-    - repoURL: git@github.com:kevrex5/kubernetes.git
-      targetRevision: HEAD
-      path: platform/cert-manager
-      directory:
-        exclude: '{values.yaml,kustomization.yaml}'
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-k8s-cert-manager
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-  ignoreDifferences:
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
-    - group: admissionregistration.k8s.io
-      kind: MutatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
+# ---
+# # ============================================================================
+# # cert-manager (sync wave 1 - needed for certificates) - DISABLED
+# # ============================================================================
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: platform-cert-manager
+#   namespace: rex5-cc-mz-k8s-argocd
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "1"
+#   finalizers:
+#     - resources-finalizer.argocd.argoproj.io
+# spec:
+#   project: platform
+#   sources:
+#     # Helm chart
+#     - repoURL: https://charts.jetstack.io
+#       chart: cert-manager
+#       targetRevision: v1.17.1  # Pinned version
+#       helm:
+#         valueFiles:
+#           - $values/platform/cert-manager/values.yaml
+#     # Values and additional resources from Git
+#     - repoURL: git@github.com:kevrex5/kubernetes.git
+#       targetRevision: HEAD
+#       ref: values
+#     # ClusterIssuers and other resources
+#     - repoURL: git@github.com:kevrex5/kubernetes.git
+#       targetRevision: HEAD
+#       path: platform/cert-manager
+#       directory:
+#         exclude: '{values.yaml,kustomization.yaml}'
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: rex5-cc-mz-k8s-cert-manager
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#       - CreateNamespace=false
+#       - ServerSideApply=true
+#     retry:
+#       limit: 5
+#       backoff:
+#         duration: 5s
+#         factor: 2
+#         maxDuration: 3m
+#   ignoreDifferences:
+#     - group: admissionregistration.k8s.io
+#       kind: ValidatingWebhookConfiguration
+#       jqPathExpressions:
+#         - .webhooks[].clientConfig.caBundle
+#     - group: admissionregistration.k8s.io
+#       kind: MutatingWebhookConfiguration
+#       jqPathExpressions:
+#         - .webhooks[].clientConfig.caBundle
 
 ---
 # ============================================================================
@@ -207,114 +206,114 @@ spec:
         factor: 2
         maxDuration: 3m
 
----
-# ============================================================================
-# Authentik (sync wave 4 - SSO/IdP)
-# ============================================================================
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: platform-authentik
-  namespace: rex5-cc-mz-k8s-argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "4"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: platform
-  sources:
-    # Helm chart
-    - repoURL: https://charts.goauthentik.io
-      chart: authentik
-      targetRevision: 2025.12.1  # Pinned version
-      helm:
-        valueFiles:
-          - $values/platform/authentik/values.yaml
-    # Values from Git
-    - repoURL: git@github.com:kevrex5/kubernetes.git
-      targetRevision: HEAD
-      ref: values
-    # HTTPRoute, ExternalSecret
-    - repoURL: git@github.com:kevrex5/kubernetes.git
-      targetRevision: HEAD
-      path: platform/authentik
-      directory:
-        exclude: '{values.yaml,kustomization.yaml}'
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-k8s-authentik
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
+# ---
+# # ============================================================================
+# # Authentik (sync wave 4 - SSO/IdP) - DISABLED
+# # ============================================================================
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: platform-authentik
+#   namespace: rex5-cc-mz-k8s-argocd
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "4"
+#   finalizers:
+#     - resources-finalizer.argocd.argoproj.io
+# spec:
+#   project: platform
+#   sources:
+#     # Helm chart
+#     - repoURL: https://charts.goauthentik.io
+#       chart: authentik
+#       targetRevision: 2025.12.1  # Pinned version
+#       helm:
+#         valueFiles:
+#           - $values/platform/authentik/values.yaml
+#     # Values from Git
+#     - repoURL: git@github.com:kevrex5/kubernetes.git
+#       targetRevision: HEAD
+#       ref: values
+#     # HTTPRoute, ExternalSecret
+#     - repoURL: git@github.com:kevrex5/kubernetes.git
+#       targetRevision: HEAD
+#       path: platform/authentik
+#       directory:
+#         exclude: '{values.yaml,kustomization.yaml}'
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: rex5-cc-mz-k8s-authentik
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#       - CreateNamespace=false
+#       - ServerSideApply=true
+#     retry:
+#       limit: 5
+#       backoff:
+#         duration: 5s
+#         factor: 2
+#         maxDuration: 3m
 
----
-# ============================================================================
-# Monitoring - kube-prometheus-stack (sync wave 5)
-# ============================================================================
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: platform-monitoring
-  namespace: rex5-cc-mz-k8s-argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "5"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: platform
-  sources:
-    # Helm chart
-    - repoURL: https://prometheus-community.github.io/helm-charts
-      chart: kube-prometheus-stack
-      targetRevision: 70.4.1  # Pinned version
-      helm:
-        valueFiles:
-          - $values/platform/monitoring/values.yaml
-        # Skip CRD installation issues
-        skipCrds: false
-    # Values from Git
-    - repoURL: git@github.com:kevrex5/kubernetes.git
-      targetRevision: HEAD
-      ref: values
-    # HTTPRoutes, ExternalSecrets, NetworkPolicies
-    - repoURL: git@github.com:kevrex5/kubernetes.git
-      targetRevision: HEAD
-      path: platform/monitoring
-      directory:
-        exclude: '{values.yaml,README.md}'
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-k8s-monitoring
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-      - ServerSideApply=true
-      - RespectIgnoreDifferences=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-  ignoreDifferences:
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
-    - group: admissionregistration.k8s.io
-      kind: MutatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
+# ---
+# # ============================================================================
+# # Monitoring - kube-prometheus-stack (sync wave 5) - DISABLED
+# # ============================================================================
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: platform-monitoring
+#   namespace: rex5-cc-mz-k8s-argocd
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "5"
+#   finalizers:
+#     - resources-finalizer.argocd.argoproj.io
+# spec:
+#   project: platform
+#   sources:
+#     # Helm chart
+#     - repoURL: https://prometheus-community.github.io/helm-charts
+#       chart: kube-prometheus-stack
+#       targetRevision: 70.4.1  # Pinned version
+#       helm:
+#         valueFiles:
+#           - $values/platform/monitoring/values.yaml
+#         # Skip CRD installation issues
+#         skipCrds: false
+#     # Values from Git
+#     - repoURL: git@github.com:kevrex5/kubernetes.git
+#       targetRevision: HEAD
+#       ref: values
+#     # HTTPRoutes, ExternalSecrets, NetworkPolicies
+#     - repoURL: git@github.com:kevrex5/kubernetes.git
+#       targetRevision: HEAD
+#       path: platform/monitoring
+#       directory:
+#         exclude: '{values.yaml,README.md}'
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: rex5-cc-mz-k8s-monitoring
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#       - CreateNamespace=false
+#       - ServerSideApply=true
+#       - RespectIgnoreDifferences=true
+#     retry:
+#       limit: 5
+#       backoff:
+#         duration: 5s
+#         factor: 2
+#         maxDuration: 3m
+#   ignoreDifferences:
+#     - group: admissionregistration.k8s.io
+#       kind: ValidatingWebhookConfiguration
+#       jqPathExpressions:
+#         - .webhooks[].clientConfig.caBundle
+#     - group: admissionregistration.k8s.io
+#       kind: MutatingWebhookConfiguration
+#       jqPathExpressions:
+#         - .webhooks[].clientConfig.caBundle

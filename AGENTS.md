@@ -15,17 +15,100 @@ Humans and AI agents must follow this guide to make changes **securely**, **repe
 
 2) **ArgoCD reconciles everything.**  
    - Anything deployed must be represented as Helm releases managed by ArgoCD.
+   - **NEVER run `kubectl apply`, `helm install`, or `helm upgrade` directly on the cluster.**
+   - All changes go through Git → ArgoCD sync.
 
-3) **No secrets in Git.**  
+3) **All configuration changes go in values.yaml.**  
+   - Update Helm chart values in Git (`platform/<component>/values.yaml` or `apps/<app>/values.yaml`)
+   - Update additional resources (HTTPRoutes, ExternalSecrets, etc.) in their respective directories
+   - Commit → Push → Let ArgoCD sync
+   - **DO NOT** manually apply manifests or run Helm commands
+
+4) **No secrets in Git.**  
    - Secrets come from Azure Key Vault via External Secrets Operator (ESO).
    - Git contains only references (ExternalSecret objects / SecretStore config).
 
-4) **Pin versions.**  
+5) **Pin versions.**  
    - Helm chart versions are pinned.
    - ArgoCD tracks a pinned Git revision for production unless explicitly approved otherwise.
 
-5) **Log work so we don't loop.**  
+6) **Log work so we don't loop.**  
    - Commands, prompts, failures, and investigations are logged every session.
+
+---
+
+## 🚨 CRITICAL GitOps Rules 🚨
+
+**THESE RULES MUST ALWAYS BE FOLLOWED. NO EXCEPTIONS.**
+
+### ✅ DO THIS (The GitOps Way)
+1. **Update values.yaml** in Git for any Helm chart configuration change
+2. **Create/update resource files** (Gateway, HTTPRoute, ExternalSecret) in their respective directories
+3. **Commit and push** changes to Git
+4. **Let ArgoCD sync** automatically (or manually sync via ArgoCD UI/CLI)
+5. **Verify via ArgoCD** that the application is Healthy and Synced
+
+### ❌ NEVER DO THIS (Anti-Patterns)
+1. **DO NOT run `kubectl apply -f <file>`** — This creates drift between Git and cluster
+2. **DO NOT run `kubectl edit <resource>`** — Changes will be overwritten by ArgoCD
+3. **DO NOT run `kubectl create <resource>`** — Must be defined in Git first
+4. **DO NOT run `helm install <chart>`** — Only ArgoCD installs Helm charts
+5. **DO NOT run `helm upgrade <release>`** — Only ArgoCD upgrades releases
+6. **DO NOT manually modify cluster resources** — Git is the source of truth
+
+### 🔧 How to Make Changes (Step by Step)
+
+**Example: Update Traefik configuration**
+```bash
+# 1. Create branch
+git checkout -b platform/update-traefik-config
+
+# 2. Edit the values file
+vim platform/traefik/values.yaml
+
+# 3. Commit changes
+git add platform/traefik/values.yaml
+git commit -m "platform(traefik): enable prometheus metrics"
+
+# 4. Push to Git
+git push origin platform/update-traefik-config
+
+# 5. Wait for ArgoCD to sync (or manually trigger)
+argocd app sync platform-traefik
+
+# 6. Verify
+argocd app get platform-traefik
+```
+
+**Example: Add a new Gateway resource**
+```bash
+# 1. Create branch
+git checkout -b platform/add-shared-gateway
+
+# 2. Create the resource file
+vim platform/traefik/gateway.yaml
+
+# 3. Update kustomization to include it
+vim platform/traefik/kustomization.yaml
+
+# 4. Commit changes
+git add platform/traefik/gateway.yaml platform/traefik/kustomization.yaml
+git commit -m "platform(traefik): add shared gateway with https listener"
+
+# 5. Push and let ArgoCD sync
+git push origin platform/add-shared-gateway
+```
+
+### 🆘 Break-Glass Exceptions
+Manual cluster changes are ONLY allowed during:
+- Initial cluster bootstrap (before ArgoCD is installed)
+- Active production incidents where Git workflow is too slow
+- Testing/validation in development environments (with immediate Git sync)
+
+**If you make a manual change:**
+1. Document it in `logs/problems/PROB-YYYYMMDD-###.md`
+2. Immediately create a PR to sync Git with the change
+3. Apply the PR so ArgoCD owns the resource going forward
 
 ---
 
@@ -215,10 +298,16 @@ Record bootstrap commands and outcomes in:
 - `logs/commands/YYYY-MM-DD.md`
 
 ### B) Day-to-day change workflow (every PR)
+
+**CRITICAL: All changes must go through Git → ArgoCD. Never apply resources directly to the cluster.**
+
 1. Create a branch:
    - `git checkout -b <type>/<short-change>`
 
-2. Make changes in Git (no kubectl edits).
+2. Make changes in Git:
+   - **UPDATE values.yaml** for Helm chart configuration changes
+   - **UPDATE or CREATE** additional resource files (Gateway, HTTPRoute, ExternalSecret, etc.)
+   - **COMMIT to Git** — do not apply directly to cluster
 
 3. Validate locally (minimum):
    - Helm render check:

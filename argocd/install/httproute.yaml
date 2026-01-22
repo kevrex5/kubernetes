@@ -35,7 +35,7 @@ metadata:
 spec:
   parentRefs:
     - name: shared-gateway
-      namespace: traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: http
   hostnames:
     - argocd.rex5.ca

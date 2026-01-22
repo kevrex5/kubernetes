@@ -1,0 +1,34 @@
+---
+# Shared Gateway for all platform and application routing
+# Uses wildcard TLS certificate from Azure Key Vault
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: rex5-cc-mz-k8s-traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: gateway
+spec:
+  gatewayClassName: traefik
+  listeners:
+    # HTTP listener - redirects to HTTPS (handled by HTTPRoute)
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All  # Allow routes from all namespaces
+    # HTTPS listener - TLS termination with wildcard certificate
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: wildcard-tls
+            namespace: rex5-cc-mz-k8s-traefik
+      allowedRoutes:
+        namespaces:
+          from: All  # Allow routes from all namespaces
