@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: argocd
 spec:
   parentRefs:
-    - name: platform-traefik-gateway
+    - name: traefik-gateway
       namespace: rex5-cc-mz-k8s-traefik
       sectionName: websecure
   hostnames:
@@ -34,7 +34,7 @@ metadata:
     app.kubernetes.io/name: argocd
 spec:
   parentRefs:
-    - name: platform-traefik-gateway
+    - name: traefik-gateway
       namespace: rex5-cc-mz-k8s-traefik
       sectionName: web
   hostnames:
