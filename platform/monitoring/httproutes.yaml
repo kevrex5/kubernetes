@@ -1,0 +1,95 @@
+---
+# HTTPRoute for Grafana web interface
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: rex5-cc-mz-k8s-monitoring
+  labels:
+    app.kubernetes.io/name: grafana
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
+      sectionName: websecure
+  hostnames:
+    - grafana.rex5.ca
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: platform-monitoring-grafana
+          port: 80
+
+---
+# HTTP to HTTPS redirect for Grafana
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-http-redirect
+  namespace: rex5-cc-mz-k8s-monitoring
+  labels:
+    app.kubernetes.io/name: grafana
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
+      sectionName: web
+  hostnames:
+    - grafana.rex5.ca
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+
+---
+# HTTPRoute for Prometheus web interface (optional - for admin access)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prometheus
+  namespace: rex5-cc-mz-k8s-monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
+      sectionName: websecure
+  hostnames:
+    - prometheus.rex5.ca
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: platform-monitoring-kube-prometh-prometheus
+          port: 9090
+
+---
+# HTTP to HTTPS redirect for Prometheus
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prometheus-http-redirect
+  namespace: rex5-cc-mz-k8s-monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: rex5-cc-mz-k8s-traefik
+      sectionName: web
+  hostnames:
+    - prometheus.rex5.ca
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

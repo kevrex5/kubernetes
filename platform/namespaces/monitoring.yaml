@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rex5-cc-mz-k8s-monitoring
+  labels:
+    name: rex5-cc-mz-k8s-monitoring
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+    kubernetes.io/metadata.name: rex5-cc-mz-k8s-monitoring

@@ -1,0 +1,173 @@
+---
+# kube-prometheus-stack Helm values
+# Includes Prometheus, Grafana, Alertmanager, and Prometheus Operator
+
+# Global settings
+global:
+  rbac:
+    create: true
+
+# Prometheus configuration
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi-premium
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 64Gi
+    
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+    
+    tolerations:
+      - key: kubernetes.azure.com/scalesetpriority
+        operator: Equal
+        value: spot
+        effect: NoSchedule
+    
+    # Service monitors enabled for auto-discovery
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+
+# Grafana configuration
+grafana:
+  enabled: true
+  
+  # Admin credentials from External Secret
+  admin:
+    existingSecret: grafana-admin-secret
+    userKey: admin-user
+    passwordKey: admin-password
+  
+  # Persistence
+  persistence:
+    enabled: true
+    storageClassName: managed-csi-premium
+    size: 32Gi
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 50m
+      memory: 200Mi
+    limits:
+      cpu: 200m
+      memory: 320Mi
+  
+  # Tolerations
+  tolerations:
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  
+  # Ingress disabled (using Gateway API)
+  ingress:
+    enabled: false
+  
+  # Datasources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://platform-monitoring-kube-prometh-prometheus:9090
+          access: proxy
+          isDefault: true
+  
+  # Dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  
+  # OAuth via Authentik
+  envFromSecrets:
+    - name: grafana-oauth-secret
+  
+  grafana.ini:
+    server:
+      root_url: https://grafana.rex5.ca
+    auth.generic_oauth:
+      enabled: true
+      name: Authentik
+      client_id: $__env{OAUTH_CLIENT_ID}
+      client_secret: $__env{OAUTH_CLIENT_SECRET}
+      scopes: openid email profile
+      auth_url: https://auth.rex5.ca/application/o/authorize/
+      token_url: https://auth.rex5.ca/application/o/token/
+      api_url: https://auth.rex5.ca/application/o/userinfo/
+      role_attribute_path: contains(groups[*], 'Grafana Admins') && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'
+
+# Alertmanager configuration
+alertmanager:
+  enabled: true
+  
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi-premium
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 8Gi
+    
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    
+    tolerations:
+      - key: kubernetes.azure.com/scalesetpriority
+        operator: Equal
+        value: spot
+        effect: NoSchedule
+
+# Prometheus Operator
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  
+  tolerations:
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+
+# Node exporter
+nodeExporter:
+  enabled: true
+
+# Kube-state-metrics
+kubeStateMetrics:
+  enabled: true
+
+serviceAccount:
+  create: true
