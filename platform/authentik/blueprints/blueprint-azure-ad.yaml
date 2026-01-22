@@ -1,0 +1,42 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint-azure-ad
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+data:
+  azure-ad-oauth.yaml: |
+    version: 1
+    metadata:
+      name: azure-ad-oauth-source
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      # ----- Azure Entra ID (OIDC) Source -----
+      - model: authentik_sources_oauth.oauthsource
+        identifiers:
+          slug: azure
+        attrs:
+          name: "Azure AD"
+          slug: "azure"
+          enabled: true
+          provider_type: "entraid"
+          tenant: !Env AUTHENTIK_AZURE_TENANT_ID
+          consumer_key: !Env AUTHENTIK_AZURE_CLIENT_ID
+          consumer_secret: !Env AUTHENTIK_AZURE_CLIENT_SECRET
+          additional_scopes: "openid profile email offline_access User.Read GroupMember.Read.All"
+          user_matching_mode: "email_link"
+          enrollment_flow: !Find [authentik_flows.flow, [slug, default-source-enrollment]]
+          user_path_template: "goauthentik.io/sources/%(slug)s"
+          icon: "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg"
+
+      # ----- Identification stage: show Azure on login -----
+      - model: authentik_stages_identification.identificationstage
+        identifiers:
+          name: "default-authentication-identification"
+        attrs:
+          show_source_labels: true
+          sources:
+            - !Find [authentik_sources_oauth.oauthsource, [slug, azure]]

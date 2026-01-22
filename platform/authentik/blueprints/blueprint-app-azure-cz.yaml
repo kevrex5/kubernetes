@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint-app-azure-cz
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+data:
+  blueprint.yaml: |
+    version: 1
+    metadata:
+      name: Azure CZ Application
+    entries:
+      - model: authentik_core.application
+        identifiers:
+          slug: azure-cz
+        attrs:
+          name: Azure CZ
+          slug: azure-cz
+          group: Costing
+          meta_launch_url: https://portal.azure.com/#@rex5.ca/blade/Microsoft_Azure_CostManagement/Menu/open/CostAnalysis/scope/%2Fsubscriptions%2F94b371b5-fed3-4400-8119-ac7a02d3cf4c/view/H4sIAAAAAAAAA41SXU%2FjMBD8K8iPqIX2WgT0LTRQIR0JalJeEEJbZ5taJHZubSOqqv%2BddVK%2BT7p79M7s7Ox4t6JQtqlgk0CNYiIODyIpfe0rcFgcSGOdFT3xxyNtxGQr3KYJrEg6D9WUUQYLcJChC3BJoLmVlGO2iEFVGyZAWRKW4JTRrYZx%2B15%2B6G7sXmrltexoIvO12PU%2ByIss%2FsYPlZ8t3GMNOaVLMbnf8naEbzhYiboISO9NZ2GhxJh3FbuHME3VuKIOSozG4IDXwznoMtTytbI3Rrs1K8g1kAtZEEJY8iM2LjryyMUaHSn5PbCnRtnW3D7NC1%2BUGAAVWqdplj8m0d31LMrT%2BdHFIp5d5o%2FpbX6dJtlRkiaXzEQNyypMCoP4%2BeJ4MyxuyTTIy6P9nNW%2FBTm1dzdXhhOD1uiXKbuHnmjUs3FfvMecmLYh3%2FdMM6RnJbE9qE%2B6f2HO0RpPEn8b2V3H%2F9FnZHzTybMnK03bYP3SSlJNELLH5%2BPl6HS4POmvsBj1x%2BPBoH82HJ73QZ7C4FcxkquxDJ%2FoiVDLcK3TKBa7VwNzgdUPAwAA
+          meta_description: Azure Compute Zone Cost Analysis
+          meta_publisher: Rex5
+          meta_icon: https://upload.wikimedia.org/wikipedia/commons/f/fa/Microsoft_Azure.svg
+          open_in_new_tab: true
+          policy_engine_mode: any

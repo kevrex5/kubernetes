@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint-app-azure-mz
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+data:
+  blueprint.yaml: |
+    version: 1
+    metadata:
+      name: Azure MZ Application
+    entries:
+      - model: authentik_core.application
+        identifiers:
+          slug: azure-mz
+        attrs:
+          name: Azure MZ
+          slug: azure-mz
+          group: Costing
+          meta_launch_url: https://portal.azure.com/#@rex5.ca/blade/Microsoft_Azure_CostManagement/Menu/open/CostAnalysis/scope/%2Fsubscriptions%2Fed4abb65-42ea-480a-a53c-aeeb0a09eeb6/view/H4sIAAAAAAAAA42RvW7DMAyEX6Xg7CfIltZolzZDnExFBlZmFKG25FJUAMPwu5ey89MmHTqK991BRw5Qu9g12K%2BwJVjA0pjUpgaF6gcTokQo4CsR97AYQPpuZiRh86SqiuJa2vNsXgVPOqpRsCLJDsvoNY2daACU6JpeAbSWyaK44KfYIKc4ffg56pS%2BT97MGFSphbG4wtuqvOHz5N6inhhYnLeweB%2B0LtNZX0ZDvs5Kcc7ZRrRUan0Yd9mqXWiN3mZtc3DxLXg5KG4OyJIjmDA3uq4tg5zyHloSduZ2YZ%2Bdi9NPTtt8TLWlLJDHjyb7Re1jcQGeg%2F4Y4z2yK6BzxyC%2F4kq9h4%2B536VTRXx0hqYL%2F8j9g1xTDIkNvQYzX%2Bd%2F%2BAuH1M3xu%2FEbbVP3flICAAA%3D
+          meta_description: Azure Management Zone Cost Analysis
+          meta_publisher: Rex5
+          meta_icon: https://upload.wikimedia.org/wikipedia/commons/f/fa/Microsoft_Azure.svg
+          open_in_new_tab: true
+          policy_engine_mode: any

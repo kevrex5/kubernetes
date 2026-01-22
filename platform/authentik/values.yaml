@@ -1,81 +1,132 @@
-# Authentik Helm Values for AKS
-# Chart: https://charts.goauthentik.io
-# Version: Pin in ArgoCD ApplicationSet
-# Docs: https://docs.goauthentik.io/
+---
+# Authentik Helm values with External Secrets integration
 
-# Replicas
-replicas: 1
+# Global envFrom to load all secrets from External Secret
+global:
+  envFrom:
+    - secretRef:
+        name: authentik-secrets
 
-# Azure Workload Identity (if using Azure Key Vault for secrets)
-# podAnnotations:
-#   azure.workload.identity/use: "true"
-
-# authentik configuration
 authentik:
-  # Secret key - MUST be set via ExternalSecret
-  secret_key: ""
-
-  # Error reporting (disable in production)
+  # Note: secret_key will be read from AUTHENTIK_SECRET_KEY env var in authentik-secrets
   error_reporting:
     enabled: false
-
-  # PostgreSQL configuration
   postgresql:
-    host: authentik-postgresql
-    name: authentik
-    user: authentik
-    password: ""  # Set via ExternalSecret
+    host: "authentik-postgresql"
+    name: "authentik"
+    user: "authentik"
+    # Note: password will be read from AUTHENTIK_POSTGRESQL__PASSWORD env var in authentik-secrets
 
-  # Redis configuration
-  redis:
-    host: authentik-redis-master
+blueprints:
+  configMaps:
+    - blueprint-azure-ad
+    - blueprint-groups-users
+    - blueprint-grafana
+    - blueprint-espocrm
+    - blueprint-app-azure-mz
+    - blueprint-app-azure-cz
 
-# Server configuration
 server:
   replicas: 1
+  tolerations:
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  ingress:
+    enabled: false  # Using Gateway API HTTPRoute instead (see httproute.yaml)
+  # Enable Prometheus metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # CRD not installed, using pod annotations instead
+      interval: 30s
+  # Add Prometheus scrape annotations
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9300"
+    prometheus.io/path: "/metrics"
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 100m
+      memory: 700Mi  # Increased from 512Mi (actual usage: 634Mi)
     limits:
-      cpu: 500m
-      memory: 512Mi
+      memory: 800Mi  # Reduced from 1Gi (20% headroom)
 
-# Worker configuration
 worker:
   replicas: 1
+  tolerations:
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+  # Add Prometheus scrape annotations for worker
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9300"
+    prometheus.io/path: "/metrics"
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 100m
+      memory: 512Mi  # Actual usage: 473Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      memory: 600Mi  # Reduced from 1Gi (27% headroom)
 
-# PostgreSQL subchart
 postgresql:
   enabled: true
   auth:
     username: authentik
     database: authentik
-    # Password set via existingSecret
+    # Note: PostgreSQL subchart will use password from global envFrom (AUTHENTIK_POSTGRESQL__PASSWORD)
+    # But we still need existingSecret for PostgreSQL's own authentication
     existingSecret: authentik-secrets
     secretKeys:
+      # PostgreSQL expects 'password' key, so we need to map it
       userPasswordKey: AUTHENTIK_POSTGRESQL__PASSWORD
+      adminPasswordKey: AUTHENTIK_POSTGRESQL__PASSWORD
+  primary:
+    tolerations:
+      - key: kubernetes.azure.com/scalesetpriority
+        operator: Equal
+        value: spot
+        effect: NoSchedule
+    persistence:
+      enabled: true
+      storageClass: managed-csi-premium
+      size: 8Gi
+    # Increase probe timeouts to prevent restarts during checkpoints
+    livenessProbe:
+      timeoutSeconds: 15  # Increased from default 5s
+      periodSeconds: 30   # Check less frequently
+    readinessProbe:
+      timeoutSeconds: 15
+      periodSeconds: 10
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi  # Doubled from 128Mi - database needs more for checkpoints
+      limits:
+        memory: 512Mi  # Increased from 192Mi for stability
 
-# Redis subchart
 redis:
   enabled: true
   architecture: standalone
   auth:
     enabled: false
+  master:
+    tolerations:
+      - key: kubernetes.azure.com/scalesetpriority
+        operator: Equal
+        value: spot
+        effect: NoSchedule
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi  # Reduced from 128Mi (actual usage: 9Mi)
+      limits:
+        memory: 64Mi  # Reduced from 256Mi (600% headroom)
 
-# Use existing secret for sensitive values
-# Create via ExternalSecret
-envFrom:
-  - secretRef:
-      name: authentik-secrets
-
-# Ingress (disabled - we use Gateway API HTTPRoute)
-ingress:
-  enabled: false
+serviceAccount:
+  create: true

@@ -11,7 +11,7 @@ spec:
   parentRefs:
     - name: traefik-gateway
       namespace: rex5-cc-mz-k8s-traefik
-      sectionName: https
+      sectionName: websecure
   hostnames:
     - auth.rex5.ca
   rules:
