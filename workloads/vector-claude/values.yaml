@@ -1,0 +1,175 @@
+# Vector Syslog Collector Helm Chart Values
+# ==========================================
+
+# -- Deployment name override
+nameOverride: ""
+# -- Full name override
+fullnameOverride: ""
+
+# -- Number of replicas
+replicaCount: 1
+
+# Container image configuration
+image:
+  # -- Vector image repository
+  repository: timberio/vector
+  # -- Vector image tag
+  tag: "0.35.0"
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# Service configuration
+service:
+  # -- Service type (ClusterIP, LoadBalancer, NodePort)
+  type: ClusterIP
+  # -- Syslog TLS port
+  port: 6514
+  # -- Optional annotations for the service
+  annotations: {}
+
+# TLS configuration for syslog ingestion
+tls:
+  # -- Name of existing secret containing tls.crt and tls.key
+  secretName: "vector-syslog-tls"
+
+# Environment/secrets configuration
+env:
+  # -- Name of existing secret containing the Azure ingestion token
+  ingestTokenSecretName: "azure-ingest-token"
+  # -- Key within the secret that contains the token
+  ingestTokenSecretKey: "token"
+
+# Azure Data Collection Rule (DCR) endpoints
+dcr:
+  dcr1:
+    # -- First DCR endpoint URI
+    uri: "https://<dce>.ingest.monitor.azure.com/dataCollectionRules/<immutableId1>/streams/<stream>?api-version=2023-01-01"
+    # -- Display name for first DCR
+    name: "dcr-6514-1"
+  dcr2:
+    # -- Second DCR endpoint URI
+    uri: "https://<dce>.ingest.monitor.azure.com/dataCollectionRules/<immutableId2>/streams/<stream>?api-version=2023-01-01"
+    # -- Display name for second DCR
+    name: "dcr-6514-2"
+
+# HTTP sink configuration
+http:
+  # -- Number of concurrent requests per sink
+  concurrency: 4
+  # -- Request timeout in seconds
+  timeoutSeconds: 30
+  # -- Compression algorithm (gzip, zstd, none)
+  compression: "gzip"
+  # -- Maximum batch size in bytes (Azure limit is ~1MB, using 900KB for safety)
+  batchMaxBytes: 900000
+  # -- Batch timeout in seconds
+  batchTimeoutSeconds: 1
+
+# Disk buffer configuration
+buffer:
+  # -- Buffer type (memory, disk)
+  type: "disk"
+  # -- Maximum buffer size in bytes (20GB)
+  maxSizeBytes: 21474836480
+  # -- Behavior when buffer is full (block, drop_newest)
+  whenFull: "block"
+
+# Hash-based splitting configuration
+hashSplit:
+  # -- Number of buckets for hash splitting
+  buckets: 2
+  # -- Fields to use for computing stable hash key
+  keyFields:
+    - ".host"
+    - ".appname"
+    - ".message"
+
+# Persistence configuration for disk buffer
+persistence:
+  # -- Enable persistent volume for Vector data directory
+  enabled: true
+  # -- PVC size
+  size: "50Gi"
+  # -- Storage class name (empty string uses default)
+  storageClassName: ""
+  # -- Access modes for PVC
+  accessModes:
+    - ReadWriteOnce
+
+# Vector API configuration (used for health checks)
+vectorApi:
+  # -- Enable Vector's GraphQL API
+  enabled: true
+  # -- API listen address
+  address: "0.0.0.0:8686"
+
+# Container resource limits and requests
+resources:
+  limits:
+    cpu: "2"
+    memory: "2Gi"
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /health
+    port: api
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /health
+    port: api
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# -- Node selector for pod scheduling
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling
+tolerations: []
+
+# -- Affinity rules for pod scheduling
+affinity: {}
+
+# -- Additional pod annotations
+podAnnotations: {}
+
+# -- Additional pod labels
+podLabels: {}
+
+# -- Service account configuration
+serviceAccount:
+  # -- Create a service account
+  create: true
+  # -- Service account name (generated if not set)
+  name: ""
+  # -- Annotations to add to the service account
+  annotations: {}

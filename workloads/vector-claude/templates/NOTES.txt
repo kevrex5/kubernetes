@@ -1,0 +1,100 @@
+===============================================================================
+  Vector Syslog Collector - {{ include "vector-syslog.fullname" . }}
+===============================================================================
+
+Vector has been deployed successfully!
+
+CONFIGURATION SUMMARY
+---------------------
+  Syslog TLS Port: {{ .Values.service.port }}
+  Service Type:    {{ .Values.service.type }}
+  Replicas:        {{ .Values.replicaCount }}
+  Persistence:     {{ if .Values.persistence.enabled }}Enabled ({{ .Values.persistence.size }}){{ else }}Disabled{{ end }}
+  Vector API:      {{ if .Values.vectorApi.enabled }}Enabled (port 8686){{ else }}Disabled{{ end }}
+
+AZURE DCR ENDPOINTS
+-------------------
+  DCR 1 ({{ .Values.dcr.dcr1.name }}): Receives ~50% of CEF traffic (hash bucket 0)
+  DCR 2 ({{ .Values.dcr.dcr2.name }}): Receives ~50% of CEF traffic (hash bucket 1)
+
+REQUIRED SECRETS
+----------------
+Before the deployment will function correctly, ensure these secrets exist:
+
+1. TLS Secret ({{ .Values.tls.secretName }}):
+   Contains tls.crt and tls.key for syslog TLS termination.
+
+   kubectl create secret tls {{ .Values.tls.secretName }} \
+     --cert=path/to/tls.crt \
+     --key=path/to/tls.key \
+     -n {{ .Release.Namespace }}
+
+2. Azure Ingest Token Secret ({{ .Values.env.ingestTokenSecretName }}):
+   Contains the bearer token for Azure Log Ingestion API.
+
+   kubectl create secret generic {{ .Values.env.ingestTokenSecretName }} \
+     --from-literal={{ .Values.env.ingestTokenSecretKey }}='<your-azure-token>' \
+     -n {{ .Release.Namespace }}
+
+TESTING THE DEPLOYMENT
+----------------------
+1. Get the service endpoint:
+{{- if eq .Values.service.type "ClusterIP" }}
+   # Port-forward for local testing
+   kubectl port-forward svc/{{ include "vector-syslog.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+{{- else if eq .Values.service.type "LoadBalancer" }}
+   # Wait for external IP
+   kubectl get svc {{ include "vector-syslog.fullname" . }} -n {{ .Release.Namespace }} -w
+{{- end }}
+
+2. Test TLS connectivity with openssl:
+
+   # Connect and send a CEF syslog message
+   echo '<14>1 2024-01-15T10:30:00Z myhost myapp 1234 - - CEF:0|Security|Firewall|1.0|100|Connection Allowed|3|src=192.168.1.100 dst=10.0.0.1 spt=12345 dpt=443' | \
+     openssl s_client -connect localhost:{{ .Values.service.port }} -quiet
+
+   # Or interactively:
+   openssl s_client -connect localhost:{{ .Values.service.port }}
+   # Then paste a CEF message and press Ctrl+D
+
+3. Sample CEF test messages:
+
+   # CEF message (will be forwarded to Azure)
+   <14>1 2024-01-15T10:30:00Z firewall01 asa 5678 - - CEF:0|Cisco|ASA|9.12|302013|Connection established|5|src=10.1.1.50 dst=8.8.8.8
+
+   # Non-CEF message (will be filtered out)
+   <14>1 2024-01-15T10:30:00Z webserver nginx 1234 - - GET /api/health HTTP/1.1 200 OK
+
+{{- if .Values.vectorApi.enabled }}
+
+MONITORING & HEALTH CHECKS
+--------------------------
+Vector API is available for health checks and metrics:
+
+   # Health check
+   kubectl exec -it deploy/{{ include "vector-syslog.fullname" . }} -n {{ .Release.Namespace }} -- \
+     curl -s http://localhost:8686/health
+
+   # Get component status (GraphQL)
+   kubectl exec -it deploy/{{ include "vector-syslog.fullname" . }} -n {{ .Release.Namespace }} -- \
+     curl -s http://localhost:8686/graphql -d '{"query":"{ health }"}'
+
+{{- end }}
+
+TROUBLESHOOTING
+---------------
+1. Check Vector logs:
+   kubectl logs -f deploy/{{ include "vector-syslog.fullname" . }} -n {{ .Release.Namespace }}
+
+2. Check if secrets exist:
+   kubectl get secret {{ .Values.tls.secretName }} -n {{ .Release.Namespace }}
+   kubectl get secret {{ .Values.env.ingestTokenSecretName }} -n {{ .Release.Namespace }}
+
+3. Verify TLS certificate:
+   kubectl get secret {{ .Values.tls.secretName }} -n {{ .Release.Namespace }} -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -text -noout
+
+4. Check disk buffer usage:
+   kubectl exec -it deploy/{{ include "vector-syslog.fullname" . }} -n {{ .Release.Namespace }} -- \
+     du -sh /var/lib/vector/
+
+===============================================================================

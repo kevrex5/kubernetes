@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vector-syslog.fullname" . }}
+  labels:
+    {{- include "vector-syslog.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    # Syslog TLS port
+    - port: {{ .Values.service.port }}
+      targetPort: syslog-tls
+      protocol: TCP
+      name: syslog-tls
+    {{- if .Values.vectorApi.enabled }}
+    # Vector API port (optional, for debugging/metrics scraping)
+    - port: 8686
+      targetPort: api
+      protocol: TCP
+      name: api
+    {{- end }}
+  selector:
+    {{- include "vector-syslog.selectorLabels" . | nindent 4 }}

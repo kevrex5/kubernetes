@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vector-syslog.configMapName" . }}
+  labels:
+    {{- include "vector-syslog.labels" . | nindent 4 }}
+data:
+  vector.yaml: |
+    # Vector Configuration
+    # ====================
+    # Syslog TLS ingestion with CEF filtering and Azure Log Analytics forwarding
+    # Hash-based 50/50 splitting between two DCR endpoints
+
+    data_dir: /var/lib/vector
+
+    {{- if .Values.vectorApi.enabled }}
+    # Vector API for health checks and introspection
+    api:
+      enabled: true
+      address: {{ .Values.vectorApi.address | quote }}
+      playground: false
+    {{- end }}
+
+    # =============================================================================
+    # SOURCES
+    # =============================================================================
+    sources:
+      # Syslog source: TLS-encrypted TCP on port 6514
+      syslog_tls:
+        type: socket
+        mode: tcp
+        address: "0.0.0.0:6514"
+        tls:
+          enabled: true
+          crt_file: /etc/vector/tls/tls.crt
+          key_file: /etc/vector/tls/tls.key
+          # Require client certificate verification (optional, uncomment if needed)
+          # verify_certificate: true
+          # ca_file: /etc/vector/tls/ca.crt
+        # Decode incoming data as raw bytes, we'll parse syslog in transform
+        decoding:
+          codec: bytes
+
+    # =============================================================================
+    # TRANSFORMS
+    # =============================================================================
+    transforms:
+      # Parse syslog messages and add metadata
+      parse_syslog:
+        type: remap
+        inputs:
+          - syslog_tls
+        source: |
+          # Parse the syslog message
+          parsed, err = parse_syslog(.message)
+          if err != null {
+            # If parsing fails, keep original message and add error flag
+            .parse_error = err
+            .raw_message = .message
+          } else {
+            # Merge parsed fields into event
+            . = merge(., parsed)
+          }
+
+          # Add metadata about ingestion
+          .meta.port_received = 6514
+          .meta.received_at = now()
+
+      # Filter for CEF (Common Event Format) messages only
+      filter_cef:
+        type: filter
+        inputs:
+          - parse_syslog
+        condition:
+          type: vrl
+          source: |
+            # Check if the message content starts with "CEF"
+            # Handle both .message (original) and parsed syslog where message is in .message
+            msg = string(.message) ?? ""
+            trimmed = strip_whitespace(msg)
+            starts_with(trimmed, "CEF")
+
+      # Compute hash bucket for load distribution
+      compute_hash_bucket:
+        type: remap
+        inputs:
+          - filter_cef
+        source: |
+          # Build a stable hash key from configured fields
+          hash_key = {{ include "vector-syslog.hashKeyExpression" . }}
+
+          # Compute CRC32 hash and determine bucket (0 or 1)
+          hash_value = crc32(hash_key)
+          .route.hash_bucket = hash_value % {{ .Values.hashSplit.buckets }}
+
+      # Route events to appropriate sink based on hash bucket
+      route_by_bucket:
+        type: route
+        inputs:
+          - compute_hash_bucket
+        route:
+          bucket_0: .route.hash_bucket == 0
+          bucket_1: .route.hash_bucket == 1
+
+    # =============================================================================
+    # SINKS
+    # =============================================================================
+    sinks:
+      # Azure Log Analytics DCR endpoint 1 (bucket 0)
+      azure_dcr_1:
+        type: http
+        inputs:
+          - route_by_bucket.bucket_0
+        uri: {{ .Values.dcr.dcr1.uri | quote }}
+        method: post
+        # Azure Log Ingestion API expects JSON array
+        # TODO: Azure Log Ingestion API expects the payload as a JSON array of objects.
+        # Vector's http sink with json encoding sends each event as a single JSON object.
+        # If Azure rejects single objects, you have two options:
+        # 1. Use batch.max_events: 1 and wrap manually in VRL: .payload = [.]
+        # 2. Use encoding.codec: "json" with a custom framing that wraps in array
+        # Current config sends individual JSON objects - adjust if Azure requires arrays.
+        encoding:
+          codec: json
+        # Authentication via Bearer token
+        request:
+          headers:
+            Authorization: "Bearer ${INGEST_TOKEN}"
+            Content-Type: "application/json"
+          concurrency: {{ .Values.http.concurrency }}
+          timeout_secs: {{ .Values.http.timeoutSeconds }}
+        # Compression
+        compression: {{ .Values.http.compression }}
+        # Batching configuration
+        batch:
+          max_bytes: {{ .Values.http.batchMaxBytes }}
+          timeout_secs: {{ .Values.http.batchTimeoutSeconds }}
+        # Disk buffer for reliability
+        buffer:
+          type: {{ .Values.buffer.type }}
+          max_size: {{ .Values.buffer.maxSizeBytes }}
+          when_full: {{ .Values.buffer.whenFull }}
+        # Healthcheck (optional, can be disabled if DCR doesn't support GET)
+        healthcheck:
+          enabled: false
+
+      # Azure Log Analytics DCR endpoint 2 (bucket 1)
+      azure_dcr_2:
+        type: http
+        inputs:
+          - route_by_bucket.bucket_1
+        uri: {{ .Values.dcr.dcr2.uri | quote }}
+        method: post
+        encoding:
+          codec: json
+        request:
+          headers:
+            Authorization: "Bearer ${INGEST_TOKEN}"
+            Content-Type: "application/json"
+          concurrency: {{ .Values.http.concurrency }}
+          timeout_secs: {{ .Values.http.timeoutSeconds }}
+        compression: {{ .Values.http.compression }}
+        batch:
+          max_bytes: {{ .Values.http.batchMaxBytes }}
+          timeout_secs: {{ .Values.http.batchTimeoutSeconds }}
+        buffer:
+          type: {{ .Values.buffer.type }}
+          max_size: {{ .Values.buffer.maxSizeBytes }}
+          when_full: {{ .Values.buffer.whenFull }}
+        healthcheck:
+          enabled: false

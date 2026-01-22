@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vector-syslog.fullname" . }}
+  labels:
+    {{- include "vector-syslog.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "vector-syslog.selectorLabels" . | nindent 6 }}
+  # Recreate strategy ensures clean shutdown and buffer handoff
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        # Trigger rolling update when config changes
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "vector-syslog.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vector-syslog.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: vector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "--config"
+            - "/etc/vector/vector.yaml"
+          env:
+            # Azure ingestion token from existing secret
+            - name: INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.env.ingestTokenSecretName }}
+                  key: {{ .Values.env.ingestTokenSecretKey }}
+          ports:
+            # Syslog TLS ingestion port
+            - name: syslog-tls
+              containerPort: 6514
+              protocol: TCP
+            {{- if .Values.vectorApi.enabled }}
+            # Vector API port for health checks
+            - name: api
+              containerPort: 8686
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.vectorApi.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            # Vector configuration file
+            - name: config
+              mountPath: /etc/vector/vector.yaml
+              subPath: vector.yaml
+              readOnly: true
+            # TLS certificates for syslog ingestion
+            - name: tls
+              mountPath: /etc/vector/tls
+              readOnly: true
+            # Persistent storage for data_dir and disk buffers
+            - name: data
+              mountPath: /var/lib/vector
+      # Graceful shutdown: give Vector time to flush buffers
+      terminationGracePeriodSeconds: 60
+      volumes:
+        # ConfigMap containing vector.yaml
+        - name: config
+          configMap:
+            name: {{ include "vector-syslog.configMapName" . }}
+        # TLS secret with tls.crt and tls.key
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+        # Persistent volume for Vector data directory
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "vector-syslog.pvcName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
