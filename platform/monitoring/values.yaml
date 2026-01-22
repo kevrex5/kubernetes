@@ -174,10 +174,20 @@ prometheusOperator:
 # Node exporter
 nodeExporter:
   enabled: true
+  tolerations:
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
 # Kube-state-metrics
 kubeStateMetrics:
   enabled: true
+  tolerations:
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
 serviceAccount:
   create: true
