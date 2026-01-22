@@ -68,7 +68,7 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: platform-monitoring-kube-prometh-prometheus
+        - name: platform-monitoring-kube-p-prometheus
           port: 9090
 
 ---
