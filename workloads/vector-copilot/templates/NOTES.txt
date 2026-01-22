@@ -1,0 +1,65 @@
+====================================================================
+Vector Syslog Ingestion has been deployed!
+====================================================================
+
+Release Name: {{ .Release.Name }}
+Namespace:    {{ .Release.Namespace }}
+
+Vector is configured to:
+- Ingest syslog over TLS on port {{ .Values.service.port }}
+- Parse and filter CEF-formatted messages
+- Forward to Azure Data Collection Rules with 50/50 hash-based splitting
+
+SERVICE ENDPOINT:
+{{- if eq .Values.service.type "LoadBalancer" }}
+  External IP: Waiting for LoadBalancer IP assignment...
+  Run: kubectl get svc {{ include "vector-copilot.fullname" . }} -n {{ .Release.Namespace }} -w
+{{- else if eq .Values.service.type "NodePort" }}
+  NodePort: kubectl get svc {{ include "vector-copilot.fullname" . }} -n {{ .Release.Namespace }}
+{{- else }}
+  ClusterIP: {{ include "vector-copilot.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+{{- end }}
+
+TESTING:
+To test syslog ingestion using OpenSSL:
+
+1. Port-forward the service (if ClusterIP):
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "vector-copilot.fullname" . }} 6514:6514
+
+2. Send a test CEF message:
+   echo 'CEF:0|Vendor|Product|Version|EventClass|Name|Severity| field1=value1 field2=value2' | \
+   openssl s_client -connect localhost:6514 -quiet -no_ign_eof
+
+3. Send a test syslog message with CEF payload:
+   echo '<134>1 2026-01-22T00:00:00.000Z hostname appname 1234 ID1 - CEF:0|Vendor|Product|1.0|100|Test Event|5| msg=Test message src=10.0.0.1' | \
+   openssl s_client -connect localhost:6514 -quiet -no_ign_eof
+
+MONITORING:
+{{- if .Values.vectorApi.enabled }}
+Check Vector health:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "vector-copilot.fullname" . }} 8686:8686
+  curl http://localhost:8686/health
+{{- end }}
+
+View logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "vector-copilot.name" . }} -f
+
+CONFIGURATION:
+- DCR Endpoint 1: {{ .Values.dcr.dcr1.name }}
+- DCR Endpoint 2: {{ .Values.dcr.dcr2.name }}
+- Buffer Type: {{ .Values.buffer.type }}
+{{- if eq .Values.buffer.type "disk" }}
+- Buffer Size: {{ div .Values.buffer.maxSizeBytes 1073741824 }}GB
+{{- end }}
+- Hash Fields: {{ .Values.hashSplit.keyFields | join ", " }}
+
+SECRETS REQUIRED:
+Ensure these secrets exist before deployment:
+- {{ .Values.tls.secretName }} (keys: tls.crt, tls.key)
+- {{ .Values.env.ingestTokenSecretName }} (key: {{ .Values.env.ingestTokenSecretKey }})
+
+NOTES:
+- Vector uses disk buffers at /var/lib/vector for reliability
+- CEF detection requires messages starting with "CEF:"
+- Hash-based splitting ensures stable routing per host/app combination
+- Azure DCR URIs should include the full API endpoint with stream name

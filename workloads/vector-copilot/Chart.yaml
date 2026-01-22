@@ -1,0 +1,17 @@
+apiVersion: v2
+name: vector-copilot
+description: Timber.io Vector for syslog ingestion with CEF parsing and Azure Log Ingestion forwarding
+type: application
+version: 1.0.0
+appVersion: "0.35.0"
+keywords:
+  - vector
+  - syslog
+  - logging
+  - azure
+  - cef
+maintainers:
+  - name: Platform Team
+home: https://vector.dev
+sources:
+  - https://github.com/vectordotdev/vector

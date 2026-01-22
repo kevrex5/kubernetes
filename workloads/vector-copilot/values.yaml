@@ -1,0 +1,160 @@
+# Default values for vector-copilot
+
+# -- Vector image configuration
+image:
+  repository: timberio/vector
+  tag: "0.35.0"
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Override the chart name
+nameOverride: ""
+
+# -- Override the full release name
+fullnameOverride: ""
+
+# -- Number of Vector replicas (typically 1 for syslog ingestion)
+replicaCount: 1
+
+# -- Service configuration
+service:
+  type: ClusterIP
+  port: 6514
+  annotations: {}
+
+# -- TLS configuration for syslog ingestion
+tls:
+  # Name of existing secret containing tls.crt and tls.key
+  secretName: "vector-tls"
+
+# -- Azure Log Ingestion configuration
+env:
+  # Name of existing secret containing the Azure DCR ingestion token
+  ingestTokenSecretName: "azure-dcr-token"
+  # Key within the secret that contains the token
+  ingestTokenSecretKey: "token"
+
+# -- Data Collection Rule endpoints
+dcr:
+  dcr1:
+    # Azure Data Collection Rule endpoint URI for first sink
+    uri: "https://<dce-name>.ingest.monitor.azure.com/dataCollectionRules/<immutableId1>/streams/Custom-<tableName>?api-version=2023-01-01"
+    # Name identifier for this DCR (used in Vector config)
+    name: "dcr-6514-1"
+  dcr2:
+    # Azure Data Collection Rule endpoint URI for second sink
+    uri: "https://<dce-name>.ingest.monitor.azure.com/dataCollectionRules/<immutableId2>/streams/Custom-<tableName>?api-version=2023-01-01"
+    # Name identifier for this DCR (used in Vector config)
+    name: "dcr-6514-2"
+
+# -- HTTP sink configuration
+http:
+  # Number of concurrent requests per sink
+  concurrency: 4
+  # Request timeout in seconds
+  timeoutSeconds: 30
+  # Compression type (gzip, zstd, or none)
+  compression: "gzip"
+  # Maximum batch size in bytes (900KB to stay under 1MB Azure limit)
+  batchMaxBytes: 900000
+  # Maximum time to wait before sending a batch
+  batchTimeoutSeconds: 1
+
+# -- Buffer configuration for reliability
+buffer:
+  # Buffer type: memory or disk (disk recommended for production)
+  type: "disk"
+  # Maximum buffer size in bytes (20GB)
+  maxSizeBytes: 21474836480
+  # What to do when buffer is full: block or drop_newest
+  whenFull: "block"
+
+# -- Hash-based splitting configuration
+hashSplit:
+  # Number of buckets (should match number of DCR sinks)
+  buckets: 2
+  # Fields to use for computing stable hash key
+  keyFields:
+    - ".host"
+    - ".appname"
+    - ".message"
+
+# -- Persistent volume for disk buffer
+persistence:
+  enabled: true
+  # Storage class (leave empty for default)
+  storageClassName: ""
+  # Size of persistent volume
+  size: 50Gi
+  # Access mode
+  accessMode: ReadWriteOnce
+
+# -- Vector API configuration (for health checks)
+vectorApi:
+  enabled: true
+  address: "0.0.0.0:8686"
+
+# -- Resource limits and requests
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+# -- Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # Vector needs to write to data_dir
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# -- Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /health
+    port: api
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# -- Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /health
+    port: api
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# -- Node selector
+nodeSelector: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- Affinity rules
+affinity: {}
+
+# -- Pod annotations
+podAnnotations: {}
+
+# -- Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""

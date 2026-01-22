@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vector-copilot.fullname" . }}
+  labels:
+    {{- include "vector-copilot.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: syslog
+      protocol: TCP
+      name: syslog
+    {{- if .Values.vectorApi.enabled }}
+    - port: 8686
+      targetPort: api
+      protocol: TCP
+      name: api
+    {{- end }}
+  selector:
+    {{- include "vector-copilot.selectorLabels" . | nindent 4 }}
