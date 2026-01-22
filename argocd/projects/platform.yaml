@@ -5,7 +5,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: platform
-  namespace: rex5-cc-mz-k8s-argocd
+  namespace: rex5-cc-mz-prod-argocd
   finalizers:
     - argoproj.io/finalizer
 spec:
@@ -27,20 +27,20 @@ spec:
     - namespace: default
       server: https://kubernetes.default.svc
     # Platform namespaces
-    - namespace: rex5-cc-mz-k8s-traefik
+    - namespace: rex5-cc-mz-prod-traefik
       server: https://kubernetes.default.svc
-    - namespace: rex5-cc-mz-k8s-cert-manager
+    - namespace: rex5-cc-mz-prod-cert-manager
       server: https://kubernetes.default.svc
-    - namespace: rex5-cc-mz-k8s-external-secrets
+    - namespace: rex5-cc-mz-prod-external-secrets
       server: https://kubernetes.default.svc
-    - namespace: rex5-cc-mz-k8s-authentik
+    - namespace: rex5-cc-mz-prod-authentik
       server: https://kubernetes.default.svc
-    - namespace: rex5-cc-mz-k8s-monitoring
+    - namespace: rex5-cc-mz-prod-monitoring
       server: https://kubernetes.default.svc
-    - namespace: rex5-cc-mz-k8s-shared
+    - namespace: rex5-cc-mz-prod-shared
       server: https://kubernetes.default.svc
     # ArgoCD namespace (for self-management)
-    - namespace: rex5-cc-mz-k8s-argocd
+    - namespace: rex5-cc-mz-prod-argocd
       server: https://kubernetes.default.svc
 
   # Cluster-scoped resources platform apps can manage

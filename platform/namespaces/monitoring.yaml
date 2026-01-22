@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: rex5-cc-mz-k8s-monitoring
+  name: rex5-cc-mz-prod-monitoring
   labels:
     app.kubernetes.io/name: monitoring
     app.kubernetes.io/component: observability

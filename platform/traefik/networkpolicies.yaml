@@ -8,7 +8,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-external-ingress
-  namespace: rex5-cc-mz-k8s-traefik
+  namespace: rex5-cc-mz-prod-traefik
 spec:
   podSelector:
     matchLabels:
@@ -24,7 +24,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-dns-egress
-  namespace: rex5-cc-mz-k8s-traefik
+  namespace: rex5-cc-mz-prod-traefik
 spec:
   podSelector: {}
   policyTypes:
@@ -46,7 +46,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: traefik-backend-egress
-  namespace: rex5-cc-mz-k8s-traefik
+  namespace: rex5-cc-mz-prod-traefik
 spec:
   podSelector:
     matchLabels:

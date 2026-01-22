@@ -4,13 +4,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: authentik
-  namespace: rex5-cc-mz-k8s-authentik
+  namespace: rex5-cc-mz-prod-authentik
   labels:
     app.kubernetes.io/name: authentik
 spec:
   parentRefs:
     - name: traefik-gateway
-      namespace: rex5-cc-mz-k8s-traefik
+      namespace: rex5-cc-mz-prod-traefik
       sectionName: https
   hostnames:
     - auth.rex5.ca
@@ -29,13 +29,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: authentik-http-redirect
-  namespace: rex5-cc-mz-k8s-authentik
+  namespace: rex5-cc-mz-prod-authentik
   labels:
     app.kubernetes.io/name: authentik
 spec:
   parentRefs:
     - name: traefik-gateway
-      namespace: rex5-cc-mz-k8s-traefik
+      namespace: rex5-cc-mz-prod-traefik
       sectionName: http
   hostnames:
     - auth.rex5.ca

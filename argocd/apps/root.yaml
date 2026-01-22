@@ -6,7 +6,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: root
-  namespace: rex5-cc-mz-k8s-argocd
+  namespace: rex5-cc-mz-prod-argocd
   finalizers:
     - argoproj.io/finalizer
 spec:
@@ -19,7 +19,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-k8s-argocd
+    namespace: rex5-cc-mz-prod-argocd
 
   syncPolicy:
     automated:

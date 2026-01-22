@@ -5,7 +5,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: apps
-  namespace: rex5-cc-mz-k8s-argocd
+  namespace: rex5-cc-mz-prod-argocd
   finalizers:
     - argoproj.io/finalizer
 spec:
