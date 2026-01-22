@@ -1,5 +1,7 @@
 # ArgoCD Installation
 
+curl -sSL -o /tmp/argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && sudo install -m 555 /tmp/argocd-linux-amd64 /usr/local/bin/argocd && rm /tmp/argocd-linux-amd64 && argocd version --client
+
 <!-- NOTE: All platform components should have a README.md with bootstrap/install commands -->
 
 ## Prerequisites

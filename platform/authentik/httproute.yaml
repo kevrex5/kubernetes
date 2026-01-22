@@ -20,7 +20,7 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: authentik-server
+        - name: platform-authentik-server
           port: 80
 
 ---
