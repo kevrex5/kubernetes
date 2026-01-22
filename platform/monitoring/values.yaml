@@ -148,7 +148,14 @@ alertmanager:
 # Prometheus Operator
 prometheusOperator:
   admissionWebhooks:
-    enabled: false  # Disabled - admission job can't schedule on spot nodes
+    enabled: false  # Disabled - can't schedule on spot nodes
+    patch:
+      enabled: false  # Disable patch job
+    certManager:
+      enabled: false  # Don't use cert-manager
+  
+  tls:
+    enabled: false  # Disable TLS for operator
   
   resources:
     requests:
