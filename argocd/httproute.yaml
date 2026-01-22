@@ -4,13 +4,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: argocd
-  namespace: rex5-cc-mz-prod-argocd
+  namespace: rex5-cc-mz-k8s-argocd
   labels:
     app.kubernetes.io/name: argocd
 spec:
   parentRefs:
     - name: platform-traefik-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: websecure
   hostnames:
     - argocd.rex5.ca
@@ -29,13 +29,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: argocd-http-redirect
-  namespace: rex5-cc-mz-prod-argocd
+  namespace: rex5-cc-mz-k8s-argocd
   labels:
     app.kubernetes.io/name: argocd
 spec:
   parentRefs:
     - name: platform-traefik-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: web
   hostnames:
     - argocd.rex5.ca

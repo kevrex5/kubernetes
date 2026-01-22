@@ -7,7 +7,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-ingress
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
 spec:
   podSelector: {}
   policyTypes:
@@ -19,7 +19,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-traefik-ingress
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
 spec:
   podSelector: {}
   policyTypes:
@@ -36,7 +36,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-internal-monitoring
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
 spec:
   podSelector: {}
   policyTypes:
@@ -45,7 +45,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: rex5-cc-mz-prod-monitoring
+              kubernetes.io/metadata.name: rex5-cc-mz-k8s-monitoring
 
 ---
 # Allow DNS egress
@@ -53,7 +53,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-dns-egress
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
 spec:
   podSelector: {}
   policyTypes:
@@ -75,7 +75,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: prometheus-scrape-egress
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
 spec:
   podSelector:
     matchLabels:
@@ -114,7 +114,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: alertmanager-notification-egress
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
 spec:
   podSelector:
     matchLabels:

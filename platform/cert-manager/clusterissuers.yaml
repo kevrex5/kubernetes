@@ -14,7 +14,7 @@ spec:
       - dns01:
           azureDNS:
             subscriptionID: ed4abb65-42ea-480a-a53c-aeeb0a09eeb6
-            resourceGroupName: rex5-cc-mz-prod-dns-rg
+            resourceGroupName: rex5-cc-mz-k8s-dns-rg
             hostedZoneName: rex5.ca
             environment: AzurePublicCloud
             managedIdentity:
@@ -36,7 +36,7 @@ spec:
       - dns01:
           azureDNS:
             subscriptionID: ed4abb65-42ea-480a-a53c-aeeb0a09eeb6
-            resourceGroupName: rex5-cc-mz-prod-dns-rg
+            resourceGroupName: rex5-cc-mz-k8s-dns-rg
             hostedZoneName: rex5.ca
             environment: AzurePublicCloud
             managedIdentity:

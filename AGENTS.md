@@ -207,10 +207,10 @@ cp -r environments/prod environments/staging
 ## Cluster model (one cluster)
 
 - Single AKS cluster.
-- Namespaces separate **platform** vs **apps** using `rex5-cc-mz-prod-<component>` naming convention.
+- Namespaces separate **platform** vs **apps** using `rex5-cc-mz-k8s-<component>` naming convention.
 - Traefik is the **only** public entrypoint (Service type LoadBalancer).
 - Apps use **Kubernetes Gateway API** (`HTTPRoute`, `TCPRoute`, `GRPCRoute`).
-- A shared `Gateway` resource in `rex5-cc-mz-prod-traefik` namespace handles all routing.
+- A shared `Gateway` resource in `rex5-cc-mz-k8s-traefik` namespace handles all routing.
 - TLS is issued by **cert-manager** using **Azure DNS DNS-01**.
 - Wildcard certificate (`*.rex5.ca`) is stored in Azure Key Vault and distributed via ESO.
 - Secrets are delivered via **External Secrets Operator** from **Azure Key Vault**.
@@ -275,10 +275,10 @@ Order matters (CRDs + dependencies):
 
 2. Install ArgoCD (manual once, then GitOps takes over):
    - Create namespace:
-     - `kubectl create namespace rex5-cc-mz-prod-argocd`
+     - `kubectl create namespace rex5-cc-mz-k8s-argocd`
    - Install ArgoCD via Helm:
      - `helm repo add argo https://argoproj.github.io/argo-helm`
-     - `helm install argocd argo/argo-cd -n rex5-cc-mz-prod-argocd -f argocd/install/values.yaml`
+     - `helm install argocd argo/argo-cd -n rex5-cc-mz-k8s-argocd -f argocd/install/values.yaml`
    - Configure SSH credentials for Git access (see argocd/install/README.md)
 
 3. Apply ArgoCD AppProjects and root app (app-of-apps):
@@ -380,7 +380,7 @@ Prefer semver tags. Use digests for high-risk components if needed.
 
 ### cert-manager Leader Election
 **Issue**: RBAC errors for resources in wrong namespace  
-**Solution**: Set `global.leaderElection.namespace` to match deployment namespace (rex5-cc-mz-prod-cert-manager)
+**Solution**: Set `global.leaderElection.namespace` to match deployment namespace (rex5-cc-mz-k8s-cert-manager)
 
 ### Git Authentication
 **Issue**: ArgoCD can't clone repository via SSH  
@@ -435,7 +435,7 @@ Prefer semver tags. Use digests for high-risk components if needed.
 - Use **Kubernetes Gateway API** for routing (not IngressRoute CRDs).
 - Resources:
   - `GatewayClass` — defines Traefik as the controller
-  - `Gateway` — shared gateway in `rex5-cc-mz-prod-traefik` namespace
+  - `Gateway` — shared gateway in `rex5-cc-mz-k8s-traefik` namespace
   - `HTTPRoute` / `TCPRoute` — per-app routing in app namespaces
 - Gateway listeners:
   - `http` (port 80) — redirects to HTTPS
@@ -634,13 +634,13 @@ kubectl logs <pod> -n <ns> --tail=200
 ```
 
 ### Controllers (common namespaces)
-- ArgoCD: `rex5-cc-mz-prod-argocd`
-- Traefik: `rex5-cc-mz-prod-traefik`
-- cert-manager: `rex5-cc-mz-prod-cert-manager`
-- external-secrets: `rex5-cc-mz-prod-external-secrets`
-- Authentik: `rex5-cc-mz-prod-authentik`
-- Monitoring: `rex5-cc-mz-prod-monitoring`
-- Shared: `rex5-cc-mz-prod-shared`
+- ArgoCD: `rex5-cc-mz-k8s-argocd`
+- Traefik: `rex5-cc-mz-k8s-traefik`
+- cert-manager: `rex5-cc-mz-k8s-cert-manager`
+- external-secrets: `rex5-cc-mz-k8s-external-secrets`
+- Authentik: `rex5-cc-mz-k8s-authentik`
+- Monitoring: `rex5-cc-mz-k8s-monitoring`
+- Shared: `rex5-cc-mz-k8s-shared`
 
 ---
 

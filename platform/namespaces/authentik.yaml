@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: rex5-cc-mz-prod-authentik
+  name: rex5-cc-mz-k8s-authentik
   labels:
     app.kubernetes.io/name: authentik
     app.kubernetes.io/component: identity-provider

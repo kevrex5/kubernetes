@@ -52,8 +52,8 @@ service:
   externalTrafficPolicy: Local
   annotations:
   
-    service.beta.kubernetes.io/azure-load-balancer-resource-group: "rex5-cc-mz-prod-publicip-rg"
-    service.beta.kubernetes.io/azure-pip-name: "rex5-cc-mz-prod-pip"
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "rex5-cc-mz-k8s-publicip-rg"
+    service.beta.kubernetes.io/azure-pip-name: "rex5-cc-mz-k8s-pip"
     service.beta.kubernetes.io/azure-load-balancer-ipv4: "4.204.154.192"
   spec:
     loadBalancerIP: "4.204.154.192"

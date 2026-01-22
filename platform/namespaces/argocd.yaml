@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: rex5-cc-mz-prod-argocd
+  name: rex5-cc-mz-k8s-argocd
   labels:
     app.kubernetes.io/name: argocd
     app.kubernetes.io/component: gitops

@@ -10,7 +10,7 @@
 # kind: Application
 # metadata:
 #   name: platform-namespaces
-#   namespace: rex5-cc-mz-prod-argocd
+#   namespace: rex5-cc-mz-k8s-argocd
 #   annotations:
 #     argocd.argoproj.io/sync-wave: "-1"
 #   finalizers:
@@ -46,7 +46,7 @@
 # kind: Application
 # metadata:
 #   name: platform-cert-manager
-#   namespace: rex5-cc-mz-prod-argocd
+#   namespace: rex5-cc-mz-k8s-argocd
 #   annotations:
 #     argocd.argoproj.io/sync-wave: "1"
 #   finalizers:
@@ -73,7 +73,7 @@
 #         exclude: '{values.yaml,kustomization.yaml}'
 #   destination:
 #     server: https://kubernetes.default.svc
-#     namespace: rex5-cc-mz-prod-cert-manager
+#     namespace: rex5-cc-mz-k8s-cert-manager
 #   syncPolicy:
 #     automated:
 #       prune: true
@@ -105,7 +105,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: platform-external-secrets
-  namespace: rex5-cc-mz-prod-argocd
+  namespace: rex5-cc-mz-k8s-argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"
   finalizers:
@@ -132,7 +132,7 @@ spec:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
     server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-prod-external-secrets
+    namespace: rex5-cc-mz-k8s-external-secrets
   syncPolicy:
     automated:
       prune: true
@@ -164,7 +164,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: platform-traefik
-  namespace: rex5-cc-mz-prod-argocd
+  namespace: rex5-cc-mz-k8s-argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
   finalizers:
@@ -191,7 +191,7 @@ spec:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
     server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-prod-traefik
+    namespace: rex5-cc-mz-k8s-traefik
   syncPolicy:
     automated:
       prune: true
@@ -214,7 +214,7 @@ spec:
 # kind: Application
 # metadata:
 #   name: platform-authentik
-#   namespace: rex5-cc-mz-prod-argocd
+#   namespace: rex5-cc-mz-k8s-argocd
 #   annotations:
 #     argocd.argoproj.io/sync-wave: "4"
 #   finalizers:
@@ -241,7 +241,7 @@ spec:
 #         exclude: '{values.yaml,kustomization.yaml}'
 #   destination:
 #     server: https://kubernetes.default.svc
-#     namespace: rex5-cc-mz-prod-authentik
+#     namespace: rex5-cc-mz-k8s-authentik
 #   syncPolicy:
 #     automated:
 #       prune: true
@@ -264,7 +264,7 @@ spec:
 # kind: Application
 # metadata:
 #   name: platform-monitoring
-#   namespace: rex5-cc-mz-prod-argocd
+#   namespace: rex5-cc-mz-k8s-argocd
 #   annotations:
 #     argocd.argoproj.io/sync-wave: "5"
 #   finalizers:
@@ -293,7 +293,7 @@ spec:
 #         exclude: '{values.yaml,README.md}'
 #   destination:
 #     server: https://kubernetes.default.svc
-#     namespace: rex5-cc-mz-prod-monitoring
+#     namespace: rex5-cc-mz-k8s-monitoring
 #   syncPolicy:
 #     automated:
 #       prune: true

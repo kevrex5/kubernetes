@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: rex5-cc-mz-prod-cert-manager
+  name: rex5-cc-mz-k8s-cert-manager
   labels:
     app.kubernetes.io/name: cert-manager
     app.kubernetes.io/component: certificate-management

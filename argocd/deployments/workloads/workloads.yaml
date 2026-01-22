@@ -6,7 +6,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: workloads
-  namespace: rex5-cc-mz-prod-argocd
+  namespace: rex5-cc-mz-k8s-argocd
 spec:
   generators:
     # Git directory generator - auto-discovers apps
@@ -22,7 +22,7 @@ spec:
   template:
     metadata:
       name: 'app-{{path.basename}}'
-      namespace: rex5-cc-mz-prod-argocd
+      namespace: rex5-cc-mz-k8s-argocd
       labels:
         app.kubernetes.io/part-of: workloads
         app.kubernetes.io/name: '{{path.basename}}'

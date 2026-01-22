@@ -13,7 +13,7 @@ extraArgs:
 # Leader election namespace
 global:
   leaderElection:
-    namespace: rex5-cc-mz-prod-cert-manager
+    namespace: rex5-cc-mz-k8s-cert-manager
 
 # Azure Workload Identity labels
 podLabels:

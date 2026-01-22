@@ -4,14 +4,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: grafana
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
   labels:
     app.kubernetes.io/name: grafana
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
     - name: traefik-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: https
   hostnames:
     - grafana.rex5.ca
@@ -30,14 +30,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: grafana-http-redirect
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
   labels:
     app.kubernetes.io/name: grafana
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
     - name: traefik-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: http
   hostnames:
     - grafana.rex5.ca
@@ -54,14 +54,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: prometheus
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
   labels:
     app.kubernetes.io/name: prometheus
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
     - name: shared-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: https
   hostnames:
     - prometheus.rex5.ca
@@ -80,14 +80,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: prometheus-http-redirect
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
   labels:
     app.kubernetes.io/name: prometheus
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
     - name: shared-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: http
   hostnames:
     - prometheus.rex5.ca
@@ -104,14 +104,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: alertmanager
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
   labels:
     app.kubernetes.io/name: alertmanager
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
     - name: shared-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: https
   hostnames:
     - alertmanager.rex5.ca
@@ -130,14 +130,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: alertmanager-http-redirect
-  namespace: rex5-cc-mz-prod-monitoring
+  namespace: rex5-cc-mz-k8s-monitoring
   labels:
     app.kubernetes.io/name: alertmanager
     app.kubernetes.io/part-of: monitoring
 spec:
   parentRefs:
     - name: shared-gateway
-      namespace: rex5-cc-mz-prod-traefik
+      namespace: rex5-cc-mz-k8s-traefik
       sectionName: http
   hostnames:
     - alertmanager.rex5.ca
