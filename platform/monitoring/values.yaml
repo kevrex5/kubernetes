@@ -171,18 +171,16 @@ prometheusOperator:
       value: spot
       effect: NoSchedule
 
-# Node exporter
-nodeExporter:
-  enabled: true
+# Node exporter (sub-chart configuration)
+prometheus-node-exporter:
   tolerations:
     - key: kubernetes.azure.com/scalesetpriority
       operator: Equal
       value: spot
       effect: NoSchedule
 
-# Kube-state-metrics
-kubeStateMetrics:
-  enabled: true
+# Kube-state-metrics (sub-chart configuration)
+kube-state-metrics:
   tolerations:
     - key: kubernetes.azure.com/scalesetpriority
       operator: Equal
