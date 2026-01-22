@@ -1,0 +1,40 @@
+---
+# Root Application - Bootstrap entry point
+# Apply this first: kubectl apply -f argocd/apps/root.yaml
+# It manages all other ArgoCD apps (App-of-Apps pattern)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: rex5-cc-mz-prod-argocd
+  finalizers:
+    - argoproj.io/finalizer
+spec:
+  project: default  # Root app uses default project for full access
+
+  source:
+    repoURL: git@github.com:kevrex5/kubernetes.git
+    targetRevision: HEAD  # TODO: Pin to tag/branch for production
+    path: argocd/apps
+    directory:
+      recurse: false
+      exclude: 'root.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rex5-cc-mz-prod-argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
