@@ -147,6 +147,9 @@ alertmanager:
 
 # Prometheus Operator
 prometheusOperator:
+  admissionWebhooks:
+    enabled: false  # Disabled - admission job can't schedule on spot nodes
+  
   resources:
     requests:
       cpu: 50m
