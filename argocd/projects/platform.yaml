@@ -37,8 +37,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: rex5-cc-mz-prod-monitoring
       server: https://kubernetes.default.svc
-    - namespace: rex5-cc-mz-prod-shared
-      server: https://kubernetes.default.svc
     # ArgoCD namespace (for self-management)
     - namespace: rex5-cc-mz-prod-argocd
       server: https://kubernetes.default.svc

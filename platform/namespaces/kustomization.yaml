@@ -7,5 +7,4 @@ resources:
   - cert-manager.yaml
   - external-secrets.yaml
   - monitoring.yaml
-  - shared.yaml
   - traefik.yaml
