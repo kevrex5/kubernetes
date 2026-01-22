@@ -130,11 +130,13 @@ gateway:
     web:
       port: 8000
       protocol: HTTP
-      namespacePolicy: All  # Allow routes from all namespaces
+      namespacePolicy: 
+        from: All  # Allow routes from all namespaces
     websecure:
       port: 8443
       protocol: HTTPS
-      namespacePolicy: All  # Allow routes from all namespaces
+      namespacePolicy:
+        from: All  # Allow routes from all namespaces
       certificateRefs:
         - name: wildcard-tls
           kind: Secret
