@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vector-default.configMapName" . }}
+  labels:
+    {{- include "vector-default.labels" . | nindent 4 }}
+data:
+  vector.yaml: |
+    # Vector Default Configuration
+    # ============================
+    # Simple syslog + HTTP listener with console output
+
+    data_dir: /var/lib/vector
+
+    {{- if .Values.vectorApi.enabled }}
+    api:
+      enabled: true
+      address: {{ .Values.vectorApi.address | quote }}
+      playground: false
+    {{- end }}
+
+    # =============================================================================
+    # SOURCES
+    # =============================================================================
+    sources:
+      # Syslog listener (UDP and TCP on port 514)
+      syslog:
+        type: syslog
+        address: "0.0.0.0:514"
+        mode: tcp
+
+      # HTTP listener for JSON events
+      http:
+        type: http_server
+        address: "0.0.0.0:8080"
+        encoding: json
+        # Optional: restrict to specific paths
+        # path: "/events"
+
+    # =============================================================================
+    # TRANSFORMS
+    # =============================================================================
+    transforms:
+      # Add metadata to all events
+      add_metadata:
+        type: remap
+        inputs:
+          - syslog
+          - http
+        source: |
+          # Add processing timestamp
+          .processed_at = now()
+
+          # Add source identifier
+          if exists(.source_type) {
+            .meta.source = .source_type
+          }
+
+    # =============================================================================
+    # SINKS
+    # =============================================================================
+    sinks:
+      # Console output for debugging/development
+      console:
+        type: console
+        inputs:
+          - add_metadata
+        encoding:
+          codec: json
+        # Pretty print for readability
+        # Change to "text" for simpler output

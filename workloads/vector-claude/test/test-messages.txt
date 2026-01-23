@@ -1,0 +1,21 @@
+# Test Messages for Vector CEF Parsing
+# =====================================
+# Copy/paste these into Vector stdin or use: cat test-messages.txt | vector --config vector-local.yaml
+
+# 1. Valid CEF message (firewall allow)
+<14>1 2024-01-15T10:30:00Z firewall01 CEF 1234 - - CEF:0|Cisco|ASA|9.12|302013|Built inbound TCP connection|5|src=192.168.1.100 dst=10.0.0.50 spt=54321 dpt=443 proto=TCP act=allow deviceDirection=0 in=1500 out=500
+
+# 2. Valid CEF message (authentication)
+<14>1 2024-01-15T10:31:00Z authserver CEF 5678 - - CEF:0|Microsoft|AzureAD|1.0|SignIn|User Sign-in|3|src=203.0.113.50 suser=john.doe@example.com outcome=success app=Office365 cat=Authentication
+
+# 3. Valid CEF message (IDS alert)
+<14>1 2024-01-15T10:32:00Z ids01 CEF 9999 - - CEF:0|Snort|IDS|3.0|1:2001|ET MALWARE Known malicious domain|8|src=10.1.1.50 dst=198.51.100.100 spt=12345 dpt=80 proto=TCP msg=Suspicious outbound connection request=http://malware.example.com/payload requestMethod=GET
+
+# 4. Non-CEF syslog (should be skipped)
+<14>1 2024-01-15T10:33:00Z webserver nginx 1111 - - 192.168.1.1 - - [15/Jan/2024:10:33:00 +0000] "GET /api/health HTTP/1.1" 200 15
+
+# 5. Malformed CEF (should fail parsing)
+<14>1 2024-01-15T10:34:00Z badhost CEF 2222 - - CEF:0|Vendor|Product
+
+# 6. CEF with custom extensions (test AdditionalExtensions)
+<14>1 2024-01-15T10:35:00Z fw02 CEF 3333 - - CEF:0|PaloAlto|Firewall|10.0|TRAFFIC|traffic|1|src=172.16.0.100 dst=8.8.8.8 spt=44444 dpt=53 proto=UDP customField1=value1 customField2=value2 myExtension=testValue

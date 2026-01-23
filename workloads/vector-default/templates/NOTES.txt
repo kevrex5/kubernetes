@@ -1,0 +1,46 @@
+===============================================================================
+  Vector Default - {{ include "vector-default.fullname" . }}
+===============================================================================
+
+Vector has been deployed with a minimal configuration!
+
+LISTENERS
+---------
+  Syslog:  {{ .Values.service.syslogPort }}/tcp
+  HTTP:    {{ .Values.service.httpPort }}/tcp (JSON events)
+  API:     8686/tcp (health checks)
+
+OUTPUT
+------
+  Console (stdout) - view with: kubectl logs
+
+QUICK TEST
+----------
+1. Port-forward the service:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "vector-default.fullname" . }} 514:{{ .Values.service.syslogPort }} 8080:{{ .Values.service.httpPort }}
+
+2. Send a syslog message:
+   echo '<14>Test syslog message from $(hostname)' | nc localhost 514
+
+3. Send an HTTP JSON event:
+   curl -X POST http://localhost:8080 \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Hello from HTTP", "level": "info"}'
+
+4. View logs:
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "vector-default.name" . }} -f
+
+HEALTH CHECK
+------------
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "vector-default.fullname" . }} -- curl -s localhost:8686/health
+
+NEXT STEPS
+----------
+This is a minimal configuration for testing. For production use:
+- Add persistent sinks (files, databases, cloud services)
+- Enable TLS for syslog listener
+- Configure authentication for HTTP endpoint
+- Add disk buffers for reliability
+
+See values.yaml.example for all configuration options.
+===============================================================================

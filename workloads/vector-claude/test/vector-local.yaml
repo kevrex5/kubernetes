@@ -1,0 +1,236 @@
+# Vector Local Test Configuration
+# ================================
+# Simplified config for local testing without TLS or Azure sinks
+# Uses stdin for input and console for output
+
+data_dir: /tmp/vector-data
+
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
+  playground: true  # Enable GraphQL playground for debugging
+
+# =============================================================================
+# SOURCES - Use stdin for testing
+# =============================================================================
+sources:
+  # For interactive testing: paste syslog lines
+  stdin:
+    type: stdin
+    decoding:
+      codec: bytes
+
+  # Alternative: demo generator for automated testing
+  # demo:
+  #   type: demo_logs
+  #   format: syslog
+  #   interval: 1
+
+# =============================================================================
+# TRANSFORMS
+# =============================================================================
+transforms:
+  # Parse syslog and CEF messages
+  parse_cef:
+    type: remap
+    inputs:
+      - stdin
+    source: |
+      .raw = .message
+
+      structured, syslog_err = parse_syslog(.message)
+      if syslog_err == null {
+        . = merge(., structured)
+      } else {
+        .syslog_parse_error = to_string(syslog_err)
+      }
+
+      .parse_status = "skipped"
+
+      if .appname == "CEF" {
+        # Normalize "CEF:" prefix
+        .message = "CEF:" + to_string(.message)
+        .message = replace(.message, r'^CEF:\s*', "CEF:")
+
+        cef_parsed, err = parse_cef(.message)
+
+        if err != null {
+          .cef_parse_error = to_string(err)
+          .cef_raw = .message
+          .parse_status = "failed"
+        } else {
+          . = merge(., cef_parsed)
+          .parse_status = "ok"
+        }
+
+        # Preserve reported syslog time
+        .reported_timestamp = .timestamp
+
+        # Track reduce window timing
+        .first_seen_unix = to_unix_timestamp!(.timestamp)
+        .last_seen_unix  = .first_seen_unix
+
+        # Vector receive time
+        .timestamp = now()
+
+        # Numeric fields for reduce
+        .cnt = to_int(.cnt) ?? 1
+        .in  = to_int(.in)  ?? 0
+        .out = to_int(.out) ?? 0
+      }
+
+  # Route based on parse status
+  route_cef:
+    type: route
+    inputs:
+      - parse_cef
+    route:
+      ok: '.parse_status == "ok"'
+      failed: '.parse_status == "failed"'
+      skipped: '.parse_status == "skipped"'
+
+  # Skip reduce for testing (to see immediate output)
+  # In production, this would be reduce_cef_events
+  clean_cef:
+    type: remap
+    inputs:
+      - route_cef.ok
+    source: |
+      del(.first_seen_unix)
+      del(.last_seen_unix)
+      del(.message)
+      del(.metadata)
+      del(.appname)
+      del(._cefVer)
+      del(.cefVersion)
+      del(.customerURI)
+
+  # Map CEF fields to Azure CommonSecurityLog schema
+  map_cef_to_azure:
+    type: remap
+    inputs:
+      - clean_cef
+    source: |
+      # Azure CommonSecurityLog field mapping (subset for testing)
+      azure_mapping = {
+        "deviceVendor": "DeviceVendor",
+        "deviceProduct": "DeviceProduct",
+        "deviceVersion": "DeviceVersion",
+        "deviceEventClassId": "DeviceEventClassID",
+        "name": "Activity",
+        "severity": "LogSeverity",
+        "act": "DeviceAction",
+        "app": "ApplicationProtocol",
+        "cat": "DeviceEventCategory",
+        "cnt": "EventCount",
+        "msg": "Message",
+        "outcome": "EventOutcome",
+        "proto": "Protocol",
+        "src": "SourceIP",
+        "spt": "SourcePort",
+        "shost": "SourceHostName",
+        "suser": "SourceUserName",
+        "dst": "DestinationIP",
+        "dpt": "DestinationPort",
+        "dhost": "DestinationHostName",
+        "duser": "DestinationUserName",
+        "dvc": "DeviceAddress",
+        "dvchost": "DeviceName",
+        "deviceDirection": "CommunicationDirection",
+        "in": "ReceivedBytes",
+        "out": "SentBytes",
+        "request": "RequestURL",
+        "requestMethod": "RequestMethod"
+      }
+
+      # Build list of Azure field names
+      azure_fields = values(azure_mapping)
+      azure_fields = push(azure_fields, "TimeGenerated")
+      azure_fields = push(azure_fields, "AdditionalExtensions")
+      azure_fields = push(azure_fields, "Computer")
+
+      # Map known CEF fields to Azure names
+      cef_keys_to_delete = []
+      for_each(azure_mapping) -> |src_key, dst_key| {
+        val = get(., [src_key]) ?? null
+        if val != null {
+          . = set!(., [dst_key], val)
+          cef_keys_to_delete = push(cef_keys_to_delete, src_key)
+        }
+      }
+
+      # Delete original CEF keys
+      for_each(cef_keys_to_delete) -> |_idx, key| {
+        . = remove(., [key], compact: true)
+      }
+
+      # TimeGenerated
+      ts = to_string(.timestamp) ?? format_timestamp!(now(), "%+")
+      ts = replace(ts, r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d{3})\d*(Z|[+-]\d{2}:\d{2})', "$1.$2$3")
+      .TimeGenerated = ts
+
+      # Build AdditionalExtensions from remaining fields
+      ext_parts = []
+      extra_keys = []
+      current_keys = keys(.)
+
+      for_each(current_keys) -> |_idx, k| {
+        if !includes(azure_fields, k) {
+          v = get(., [k]) ?? null
+          if v != null {
+            v_str = to_string(v) ?? encode_json(v) ?? ""
+            ext_parts = push(ext_parts, k + "=" + v_str)
+            extra_keys = push(extra_keys, k)
+          }
+        }
+      }
+
+      if length(ext_parts) > 0 {
+        .AdditionalExtensions = join!(ext_parts, ";")
+      } else {
+        .AdditionalExtensions = ""
+      }
+
+      # Remove extra keys
+      for_each(extra_keys) -> |_idx, key| {
+        . = remove(., [key], compact: true)
+      }
+
+      # Enforce numeric types
+      if exists(.DestinationPort) { .DestinationPort = to_int(.DestinationPort) ?? null }
+      if exists(.SourcePort)      { .SourcePort      = to_int(.SourcePort)      ?? null }
+      if exists(.ReceivedBytes)   { .ReceivedBytes   = to_int(.ReceivedBytes)   ?? 0 }
+      if exists(.SentBytes)       { .SentBytes       = to_int(.SentBytes)       ?? 0 }
+      if exists(.EventCount)      { .EventCount      = to_int(.EventCount)      ?? 1 }
+
+# =============================================================================
+# SINKS - Console output for testing
+# =============================================================================
+sinks:
+  # CEF events mapped to Azure format
+  console_azure:
+    type: console
+    inputs:
+      - map_cef_to_azure
+    encoding:
+      codec: json
+      # Pretty print for readability
+    target: stdout
+
+  # Failed CEF parsing
+  console_failed:
+    type: console
+    inputs:
+      - route_cef.failed
+    encoding:
+      codec: json
+    target: stderr
+
+  # Non-CEF events (skipped)
+  console_skipped:
+    type: console
+    inputs:
+      - route_cef.skipped
+    encoding:
+      codec: json
+    target: stderr

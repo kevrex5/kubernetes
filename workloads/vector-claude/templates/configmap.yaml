@@ -8,7 +8,7 @@ data:
   vector.yaml: |
     # Vector Configuration
     # ====================
-    # Syslog TLS ingestion with CEF filtering and Azure Log Analytics forwarding
+    # Syslog TLS ingestion with CEF parsing, aggregation, and Azure Log Analytics forwarding
     # Hash-based 50/50 splitting between two DCR endpoints
 
     data_dir: /var/lib/vector
@@ -30,14 +30,11 @@ data:
         type: socket
         mode: tcp
         address: "0.0.0.0:6514"
+        max_length: 102400
         tls:
           enabled: true
           crt_file: /etc/vector/tls/tls.crt
           key_file: /etc/vector/tls/tls.key
-          # Require client certificate verification (optional, uncomment if needed)
-          # verify_certificate: true
-          # ca_file: /etc/vector/tls/ca.crt
-        # Decode incoming data as raw bytes, we'll parse syslog in transform
         decoding:
           codec: bytes
 
@@ -45,53 +42,326 @@ data:
     # TRANSFORMS
     # =============================================================================
     transforms:
-      # Parse syslog messages and add metadata
-      parse_syslog:
+      # Parse syslog and CEF messages
+      parse_cef:
         type: remap
         inputs:
           - syslog_tls
         source: |
-          # Parse the syslog message
-          parsed, err = parse_syslog(.message)
-          if err != null {
-            # If parsing fails, keep original message and add error flag
-            .parse_error = err
-            .raw_message = .message
+          .raw = .message
+
+          structured, syslog_err = parse_syslog(.message)
+          if syslog_err == null {
+            . = merge(., structured)
           } else {
-            # Merge parsed fields into event
-            . = merge(., parsed)
+            .syslog_parse_error = to_string(syslog_err)
           }
 
-          # Add metadata about ingestion
-          .meta.port_received = 6514
-          .meta.received_at = now()
+          .parse_status = "skipped"
 
-      # Filter for CEF (Common Event Format) messages only
-      filter_cef:
-        type: filter
+          if .appname == "CEF" {
+            # Normalize "CEF:" prefix
+            .message = "CEF:" + to_string(.message)
+            .message = replace(.message, r'^CEF:\s*', "CEF:")
+
+            cef_parsed, err = parse_cef(.message)
+
+            if err != null {
+              .cef_parse_error = to_string(err)
+              .cef_raw = .message
+              .parse_status = "failed"
+            } else {
+              . = merge(., cef_parsed)
+              .parse_status = "ok"
+            }
+
+            # Preserve reported syslog time
+            .reported_timestamp = .timestamp
+
+            # Track reduce window timing
+            .first_seen_unix = to_unix_timestamp!(.timestamp)
+            .last_seen_unix  = .first_seen_unix
+
+            # Vector receive time
+            .timestamp = now()
+
+            # Numeric fields for reduce
+            .cnt = to_int(.cnt) ?? 1
+            .in  = to_int(.in)  ?? 0
+            .out = to_int(.out) ?? 0
+          }
+
+      # Route based on parse status
+      route_cef:
+        type: route
         inputs:
-          - parse_syslog
-        condition:
-          type: vrl
-          source: |
-            # Check if the message content starts with "CEF"
-            # Handle both .message (original) and parsed syslog where message is in .message
-            msg = string(.message) ?? ""
-            trimmed = strip_whitespace(msg)
-            starts_with(trimmed, "CEF")
+          - parse_cef
+        route:
+          ok: '.parse_status == "ok"'
+          failed: '.parse_status == "failed"'
 
-      # Compute hash bucket for load distribution
+      # Aggregate CEF events to reduce volume
+      reduce_cef_events:
+        type: reduce
+        inputs:
+          - route_cef.ok
+        group_by:
+          - deviceVendor
+          - deviceProduct
+          - deviceVersion
+          - deviceEventClassId
+          - name
+          - severity
+          - src
+          - dst
+          - dpt
+          - proto
+          - deviceDirection
+          - suser
+          - duser
+          - shost
+          - dhost
+          - act
+          - outcome
+          - cat
+          - app
+          - fname
+          - filePath
+          - fileHash
+          - dvc
+          - dvchost
+          - request
+          - requestMethod
+        ends_when: |
+          (to_int(.reduce.count) ?? 0) >= 500 ||
+          (to_int(.last_seen_unix) ?? 0) - (to_int(.first_seen_unix) ?? 0) >= 10
+        expire_after_ms: 5000
+        flush_period_ms: 2000
+        max_events: 1000
+        merge_strategies:
+          first_seen_unix: min
+          last_seen_unix: max
+          cnt: sum
+          in: sum
+          out: sum
+
+      # Clean up temporary fields
+      clean_cef:
+        type: remap
+        inputs:
+          - reduce_cef_events
+        source: |
+          del(.first_seen_unix)
+          del(.last_seen_unix)
+          del(.message)
+          del(.metadata)
+          del(.appname)
+          del(._cefVer)
+          del(.cefVersion)
+          del(.customerURI)
+
+      # Map CEF fields to Azure CommonSecurityLog schema
+      map_cef_to_azure:
+        type: remap
+        inputs:
+          - clean_cef
+        source: |
+          # Azure CommonSecurityLog field mapping
+          # CEF field -> Azure field
+          azure_mapping = {
+            "deviceVendor": "DeviceVendor",
+            "deviceProduct": "DeviceProduct",
+            "deviceVersion": "DeviceVersion",
+            "deviceEventClassId": "DeviceEventClassID",
+            "name": "Activity",
+            "severity": "LogSeverity",
+            "act": "DeviceAction",
+            "app": "ApplicationProtocol",
+            "cat": "DeviceEventCategory",
+            "cnt": "EventCount",
+            "msg": "Message",
+            "outcome": "EventOutcome",
+            "proto": "Protocol",
+            "reason": "Reason",
+            "type": "EventType",
+            "src": "SourceIP",
+            "spt": "SourcePort",
+            "shost": "SourceHostName",
+            "suser": "SourceUserName",
+            "suid": "SourceUserID",
+            "sproc": "SourceProcessName",
+            "spid": "SourceProcessId",
+            "spriv": "SourceUserPrivileges",
+            "sntdom": "SourceNTDomain",
+            "sourceDnsDomain": "SourceDnsDomain",
+            "sourceServiceName": "SourceServiceName",
+            "sourceTranslatedAddress": "SourceTranslatedAddress",
+            "sourceTranslatedPort": "SourceTranslatedPort",
+            "dst": "DestinationIP",
+            "dpt": "DestinationPort",
+            "dhost": "DestinationHostName",
+            "duser": "DestinationUserName",
+            "dproc": "DestinationProcessName",
+            "dpid": "DestinationProcessId",
+            "dpriv": "DestinationUserPrivileges",
+            "dntdom": "DestinationNTDomain",
+            "destinationDnsDomain": "DestinationDnsDomain",
+            "destinationServiceName": "DestinationServiceName",
+            "destinationTranslatedAddress": "DestinationTranslatedAddress",
+            "destinationTranslatedPort": "DestinationTranslatedPort",
+            "dvc": "DeviceAddress",
+            "dvchost": "DeviceName",
+            "dvcmac": "DeviceMacAddress",
+            "dtz": "DeviceTimeZone",
+            "deviceDirection": "CommunicationDirection",
+            "deviceDnsDomain": "DeviceDnsDomain",
+            "deviceFacility": "DeviceFacility",
+            "deviceInboundInterface": "DeviceInboundInterface",
+            "deviceNtDomain": "DeviceNtDomain",
+            "deviceOutboundInterface": "DeviceOutboundInterface",
+            "devicePayloadId": "DevicePayloadId",
+            "deviceProcessName": "ProcessName",
+            "deviceTranslatedAddress": "DeviceTranslatedAddress",
+            "fname": "FileName",
+            "fsize": "FileSize",
+            "fileId": "FileID",
+            "filePath": "FilePath",
+            "fileHash": "FileHash",
+            "fileType": "FileType",
+            "filePermission": "FilePermission",
+            "fileCreateTime": "FileCreateTime",
+            "fileModificationTime": "FileModificationTime",
+            "oldFileName": "OldFileName",
+            "oldFilePath": "OldFilePath",
+            "oldFileHash": "OldFileHash",
+            "oldFileSize": "OldFileSize",
+            "oldFileType": "OldFileType",
+            "oldFilePermission": "OldFilePermission",
+            "oldFileCreateTime": "OldFileCreateTime",
+            "oldFileModificationTime": "OldFileModificationTime",
+            "request": "RequestURL",
+            "requestMethod": "RequestMethod",
+            "requestContext": "RequestContext",
+            "requestCookies": "RequestCookies",
+            "requestClientApplication": "RequestClientApplication",
+            "in": "ReceivedBytes",
+            "out": "SentBytes",
+            "rt": "ReceiptTime",
+            "externalId": "ExternalID",
+            "c6a1": "DeviceCustomIPv6Address1",
+            "c6a1Label": "DeviceCustomIPv6Address1Label",
+            "c6a2": "DeviceCustomIPv6Address2",
+            "c6a2Label": "DeviceCustomIPv6Address2Label",
+            "c6a3": "DeviceCustomIPv6Address3",
+            "c6a3Label": "DeviceCustomIPv6Address3Label",
+            "c6a4": "DeviceCustomIPv6Address4",
+            "c6a4Label": "DeviceCustomIPv6Address4Label",
+            "cfp1": "DeviceCustomFloatingPoint1",
+            "cfp2": "DeviceCustomFloatingPoint2",
+            "cfp3": "DeviceCustomFloatingPoint3",
+            "cfp4": "DeviceCustomFloatingPoint4",
+            "cn1": "DeviceCustomNumber1",
+            "cn1Label": "DeviceCustomNumber1Label",
+            "cn2": "DeviceCustomNumber2",
+            "cn2Label": "DeviceCustomNumber2Label",
+            "cn3": "DeviceCustomNumber3",
+            "cn3Label": "DeviceCustomNumber3Label",
+            "flexString1": "FlexString1",
+            "flexString1Label": "FlexString1Label",
+            "flexString2": "FlexString2",
+            "flexString2Label": "FlexString2Label",
+            "deviceCustomDate1": "DeviceCustomDate1",
+            "deviceCustomDate1Label": "DeviceCustomDate1Label",
+            "deviceCustomDate2": "DeviceCustomDate2",
+            "deviceCustomDate2Label": "DeviceCustomDate2Label",
+            "flexDate1": "FlexDate1",
+            "flexDate1Label": "FlexDate1Label",
+            "flexNumber1": "FlexNumber1",
+            "flexNumber1Label": "FlexNumber1Label",
+            "flexNumber2": "FlexNumber2",
+            "flexNumber2Label": "FlexNumber2Label"
+          }
+
+          # Build list of Azure field names (allowed in final output)
+          azure_fields = values(azure_mapping)
+          azure_fields = push(azure_fields, "TimeGenerated")
+          azure_fields = push(azure_fields, "AdditionalExtensions")
+          azure_fields = push(azure_fields, "Computer")
+
+          # 1) Map known CEF fields to Azure names and collect source keys to delete
+          cef_keys_to_delete = []
+          for_each(azure_mapping) -> |src_key, dst_key| {
+            val = get(., [src_key]) ?? null
+            if val != null {
+              . = set!(., [dst_key], val)
+              cef_keys_to_delete = push(cef_keys_to_delete, src_key)
+            }
+          }
+
+          # Delete original CEF keys after mapping
+          for_each(cef_keys_to_delete) -> |_idx, key| {
+            . = remove(., [key], compact: true)
+          }
+
+          # 2) TimeGenerated from timestamp (required by Azure, trim to milliseconds)
+          ts = to_string(.timestamp) ?? format_timestamp!(now(), "%+")
+          ts = replace(ts, r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d{3})\d*(Z|[+-]\d{2}:\d{2})', "$1.$2$3")
+          .TimeGenerated = ts
+
+          # 3) Build AdditionalExtensions from remaining non-Azure fields
+          ext_parts = []
+          extra_keys = []
+
+          # Get all current keys
+          current_keys = keys(.)
+
+          for_each(current_keys) -> |_idx, k| {
+            if !includes(azure_fields, k) {
+              v = get(., [k]) ?? null
+              if v != null {
+                v_str = to_string(v) ?? encode_json(v) ?? ""
+                ext_parts = push(ext_parts, k + "=" + v_str)
+                extra_keys = push(extra_keys, k)
+              }
+            }
+          }
+
+          # Join extensions with semicolon separator
+          if length(ext_parts) > 0 {
+            .AdditionalExtensions = join!(ext_parts, ";")
+          } else {
+            .AdditionalExtensions = ""
+          }
+
+          # Remove extra keys after building AdditionalExtensions
+          for_each(extra_keys) -> |_idx, key| {
+            . = remove(., [key], compact: true)
+          }
+
+          # 4) Enforce numeric types for Azure schema
+          if exists(.DestinationPort) { .DestinationPort = to_int(.DestinationPort) ?? null }
+          if exists(.SourcePort)      { .SourcePort      = to_int(.SourcePort)      ?? null }
+          if exists(.ReceivedBytes)   { .ReceivedBytes   = to_int(.ReceivedBytes)   ?? 0 }
+          if exists(.SentBytes)       { .SentBytes       = to_int(.SentBytes)       ?? 0 }
+          if exists(.EventCount)      { .EventCount      = to_int(.EventCount)      ?? 1 }
+
+      # Compute hash bucket for load distribution (after Azure mapping)
       compute_hash_bucket:
         type: remap
         inputs:
-          - filter_cef
+          - map_cef_to_azure
         source: |
-          # Build a stable hash key from configured fields
-          hash_key = {{ include "vector-syslog.hashKeyExpression" . }}
+          # Build a stable hash key from key fields
+          # Using Azure field names now
+          hash_key = to_string(.DeviceVendor) ?? ""
+          hash_key = hash_key + "|" + (to_string(.DeviceProduct) ?? "")
+          hash_key = hash_key + "|" + (to_string(.SourceIP) ?? "")
+          hash_key = hash_key + "|" + (to_string(.DestinationIP) ?? "")
+          hash_key = hash_key + "|" + (to_string(.Activity) ?? "")
 
           # Compute CRC32 hash and determine bucket (0 or 1)
           hash_value = crc32(hash_key)
-          .route.hash_bucket = hash_value % {{ .Values.hashSplit.buckets }}
+          .__hash_bucket = hash_value % {{ .Values.hashSplit.buckets }}
 
       # Route events to appropriate sink based on hash bucket
       route_by_bucket:
@@ -99,8 +369,23 @@ data:
         inputs:
           - compute_hash_bucket
         route:
-          bucket_0: .route.hash_bucket == 0
-          bucket_1: .route.hash_bucket == 1
+          bucket_0: '.__hash_bucket == 0'
+          bucket_1: '.__hash_bucket == 1'
+
+      # Clean routing metadata before sending to Azure
+      clean_for_azure_0:
+        type: remap
+        inputs:
+          - route_by_bucket.bucket_0
+        source: |
+          del(.__hash_bucket)
+
+      clean_for_azure_1:
+        type: remap
+        inputs:
+          - route_by_bucket.bucket_1
+        source: |
+          del(.__hash_bucket)
 
     # =============================================================================
     # SINKS
@@ -110,37 +395,32 @@ data:
       azure_dcr_1:
         type: http
         inputs:
-          - route_by_bucket.bucket_0
+          - clean_for_azure_0
         uri: {{ .Values.dcr.dcr1.uri | quote }}
         method: post
-        # Azure Log Ingestion API expects JSON array
-        # TODO: Azure Log Ingestion API expects the payload as a JSON array of objects.
-        # Vector's http sink with json encoding sends each event as a single JSON object.
-        # If Azure rejects single objects, you have two options:
-        # 1. Use batch.max_events: 1 and wrap manually in VRL: .payload = [.]
-        # 2. Use encoding.codec: "json" with a custom framing that wraps in array
-        # Current config sends individual JSON objects - adjust if Azure requires arrays.
         encoding:
           codec: json
-        # Authentication via Bearer token
-        request:
-          headers:
-            Authorization: "Bearer ${INGEST_TOKEN}"
-            Content-Type: "application/json"
-          concurrency: {{ .Values.http.concurrency }}
-          timeout_secs: {{ .Values.http.timeoutSeconds }}
-        # Compression
+        auth:
+          strategy: bearer
+          token: "${INGEST_TOKEN}"
+        headers:
+          Content-Type: "application/json"
         compression: {{ .Values.http.compression }}
-        # Batching configuration
         batch:
           max_bytes: {{ .Values.http.batchMaxBytes }}
           timeout_secs: {{ .Values.http.batchTimeoutSeconds }}
-        # Disk buffer for reliability
+        request:
+          concurrency: {{ .Values.http.concurrency }}
+          timeout_secs: {{ .Values.http.timeoutSeconds }}
+          retry_attempts: 5
+          retry_initial_backoff_secs: 1
+          retry_max_duration_secs: 300
         buffer:
-          type: {{ .Values.buffer.type }}
-          max_size: {{ .Values.buffer.maxSizeBytes }}
-          when_full: {{ .Values.buffer.whenFull }}
-        # Healthcheck (optional, can be disabled if DCR doesn't support GET)
+          type: {{ .Values.buffer.type | quote }}
+          {{- if eq .Values.buffer.type "disk" }}
+          max_size: {{ int64 .Values.buffer.maxSizeBytes }}
+          when_full: {{ .Values.buffer.whenFull | quote }}
+          {{- end }}
         healthcheck:
           enabled: false
 
@@ -148,24 +428,40 @@ data:
       azure_dcr_2:
         type: http
         inputs:
-          - route_by_bucket.bucket_1
+          - clean_for_azure_1
         uri: {{ .Values.dcr.dcr2.uri | quote }}
         method: post
         encoding:
           codec: json
-        request:
-          headers:
-            Authorization: "Bearer ${INGEST_TOKEN}"
-            Content-Type: "application/json"
-          concurrency: {{ .Values.http.concurrency }}
-          timeout_secs: {{ .Values.http.timeoutSeconds }}
+        auth:
+          strategy: bearer
+          token: "${INGEST_TOKEN}"
+        headers:
+          Content-Type: "application/json"
         compression: {{ .Values.http.compression }}
         batch:
           max_bytes: {{ .Values.http.batchMaxBytes }}
           timeout_secs: {{ .Values.http.batchTimeoutSeconds }}
+        request:
+          concurrency: {{ .Values.http.concurrency }}
+          timeout_secs: {{ .Values.http.timeoutSeconds }}
+          retry_attempts: 5
+          retry_initial_backoff_secs: 1
+          retry_max_duration_secs: 300
         buffer:
-          type: {{ .Values.buffer.type }}
-          max_size: {{ .Values.buffer.maxSizeBytes }}
-          when_full: {{ .Values.buffer.whenFull }}
+          type: {{ .Values.buffer.type | quote }}
+          {{- if eq .Values.buffer.type "disk" }}
+          max_size: {{ int64 .Values.buffer.maxSizeBytes }}
+          when_full: {{ .Values.buffer.whenFull | quote }}
+          {{- end }}
         healthcheck:
           enabled: false
+
+      # Failed CEF parse events (optional: send to separate destination or log)
+      # Uncomment to capture failed events for debugging
+      # failed_events:
+      #   type: console
+      #   inputs:
+      #     - route_cef.failed
+      #   encoding:
+      #     codec: json

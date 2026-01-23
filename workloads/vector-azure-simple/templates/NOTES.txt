@@ -1,0 +1,77 @@
+===============================================================================
+  Vector Azure Simple - {{ include "vector-azure-simple.fullname" . }}
+===============================================================================
+
+Vector has been deployed with Azure Log Analytics forwarding!
+
+CONFIGURATION
+-------------
+  Syslog TLS Port:  {{ .Values.service.port }}
+  Service Type:     {{ .Values.service.type }}
+  Buffer Type:      {{ .Values.buffer.type }}
+{{- if eq .Values.buffer.type "disk" }}
+  Buffer Size:      {{ div .Values.buffer.maxSizeBytes 1073741824 }}GB
+{{- end }}
+  Persistence:      {{ if .Values.persistence.enabled }}Enabled ({{ .Values.persistence.size }}){{ else }}Disabled{{ end }}
+
+AZURE DESTINATION
+-----------------
+  DCR URI: {{ .Values.azure.dcrUri }}
+
+REQUIRED SECRETS
+----------------
+Before deployment, create these Kubernetes secrets:
+
+1. TLS Certificate ({{ .Values.tls.secretName }}):
+   kubectl create secret tls {{ .Values.tls.secretName }} \
+     --cert=path/to/tls.crt \
+     --key=path/to/tls.key \
+     -n {{ .Release.Namespace }}
+
+2. Azure DCR Token ({{ .Values.azure.tokenSecretName }}):
+   kubectl create secret generic {{ .Values.azure.tokenSecretName }} \
+     --from-literal={{ .Values.azure.tokenSecretKey }}='<your-bearer-token>' \
+     -n {{ .Release.Namespace }}
+
+   To get a token, use Azure CLI:
+   az account get-access-token --resource https://monitor.azure.com --query accessToken -o tsv
+
+   NOTE: Tokens expire! For production, implement token refresh via:
+   - Azure Workload Identity
+   - External Secrets Operator
+   - Custom sidecar container
+
+TESTING
+-------
+1. Port-forward:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "vector-azure-simple.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+2. Send test syslog message:
+   echo '<14>1 2024-01-15T10:30:00Z testhost testapp 1234 - - Test message' | \
+     openssl s_client -connect localhost:{{ .Values.service.port }} -quiet
+
+3. View logs:
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "vector-azure-simple.name" . }} -f
+
+HEALTH CHECK
+------------
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "vector-azure-simple.fullname" . }} -- \
+     curl -s localhost:8686/health
+
+TROUBLESHOOTING
+---------------
+1. Check Vector logs for Azure errors:
+   kubectl logs -n {{ .Release.Namespace }} deploy/{{ include "vector-azure-simple.fullname" . }} | grep -i error
+
+2. Verify secrets exist:
+   kubectl get secret {{ .Values.tls.secretName }} {{ .Values.azure.tokenSecretName }} -n {{ .Release.Namespace }}
+
+3. Test Azure connectivity:
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "vector-azure-simple.fullname" . }} -- \
+     curl -I "https://monitor.azure.com"
+
+4. Check buffer usage:
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "vector-azure-simple.fullname" . }} -- \
+     du -sh /var/lib/vector/
+
+===============================================================================

@@ -1,6 +1,6 @@
 apiVersion: v2
-name: vector-syslog
-description: A Helm chart for deploying Timber.io Vector as a syslog collector with TLS and Azure Log Analytics forwarding
+name: vector-azure-simple
+description: Vector deployment with syslog TLS ingestion and single Azure Log Analytics destination
 type: application
 version: 1.0.0
 appVersion: "0.35.0"
@@ -9,7 +9,7 @@ keywords:
   - syslog
   - logging
   - azure
-  - cef
+  - log-analytics
 maintainers:
   - name: Platform Team
 home: https://vector.dev

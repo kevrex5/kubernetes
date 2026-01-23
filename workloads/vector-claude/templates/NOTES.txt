@@ -17,6 +17,15 @@ AZURE DCR ENDPOINTS
   DCR 1 ({{ .Values.dcr.dcr1.name }}): Receives ~50% of CEF traffic (hash bucket 0)
   DCR 2 ({{ .Values.dcr.dcr2.name }}): Receives ~50% of CEF traffic (hash bucket 1)
 
+BUFFER CONFIGURATION
+--------------------
+  Buffer Type:   {{ .Values.buffer.type }}
+{{- if eq .Values.buffer.type "disk" }}
+  Buffer Size:   {{ div .Values.buffer.maxSizeBytes 1073741824 }}GB
+{{- end }}
+  When Full:     {{ .Values.buffer.whenFull }}
+  Hash Fields:   {{ .Values.hashSplit.keyFields | join ", " }}
+
 REQUIRED SECRETS
 ----------------
 Before the deployment will function correctly, ensure these secrets exist:

@@ -1,36 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "vector-syslog.fullname" . }}
+  name: {{ include "vector-azure-simple.fullname" . }}
   labels:
-    {{- include "vector-syslog.labels" . | nindent 4 }}
+    {{- include "vector-azure-simple.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "vector-syslog.selectorLabels" . | nindent 6 }}
-  # Recreate strategy ensures clean shutdown and buffer handoff
+      {{- include "vector-azure-simple.selectorLabels" . | nindent 6 }}
   strategy:
     type: Recreate
   template:
     metadata:
       annotations:
-        # Trigger rolling update when config changes
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "vector-syslog.labels" . | nindent 8 }}
-        {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- include "vector-azure-simple.labels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "vector-syslog.serviceAccountName" . }}
+      serviceAccountName: {{ include "vector-azure-simple.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -38,22 +33,20 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - "--config"
-            - "/etc/vector/vector.yaml"
+            - --config
+            - /etc/vector/vector.yaml
           env:
-            # Azure ingestion token from existing secret
-            - name: INGEST_TOKEN
+            # Azure DCR token from Kubernetes secret
+            - name: AZURE_DCR_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.env.ingestTokenSecretName }}
-                  key: {{ .Values.env.ingestTokenSecretKey }}
+                  name: {{ .Values.azure.tokenSecretName }}
+                  key: {{ .Values.azure.tokenSecretKey }}
           ports:
-            # Syslog TLS ingestion port
             - name: syslog-tls
               containerPort: 6514
               protocol: TCP
             {{- if .Values.vectorApi.enabled }}
-            # Vector API port for health checks
             - name: api
               containerPort: 8686
               protocol: TCP
@@ -69,26 +62,20 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           volumeMounts:
-            # Vector configuration file
             - name: config
               mountPath: /etc/vector/vector.yaml
               subPath: vector.yaml
               readOnly: true
-            # TLS certificates for syslog ingestion
             - name: tls
               mountPath: /etc/vector/tls
               readOnly: true
-            # Persistent storage for data_dir and disk buffers
             - name: data
               mountPath: /var/lib/vector
-      # Graceful shutdown: give Vector time to flush buffers
       terminationGracePeriodSeconds: 60
       volumes:
-        # ConfigMap containing vector.yaml
         - name: config
           configMap:
-            name: {{ include "vector-syslog.configMapName" . }}
-        # TLS secret with tls.crt and tls.key
+            name: {{ include "vector-azure-simple.configMapName" . }}
         - name: tls
           secret:
             secretName: {{ .Values.tls.secretName }}
@@ -97,11 +84,10 @@ spec:
                 path: tls.crt
               - key: tls.key
                 path: tls.key
-        # Persistent volume for Vector data directory
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "vector-syslog.pvcName" . }}
+            claimName: {{ include "vector-azure-simple.pvcName" . }}
           {{- else }}
           emptyDir: {}
           {{- end }}

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vector-default.fullname" . }}
+  labels:
+    {{- include "vector-default.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.syslogPort }}
+      targetPort: syslog
+      protocol: TCP
+      name: syslog
+    - port: {{ .Values.service.httpPort }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- if .Values.vectorApi.enabled }}
+    - port: 8686
+      targetPort: api
+      protocol: TCP
+      name: api
+    {{- end }}
+  selector:
+    {{- include "vector-default.selectorLabels" . | nindent 4 }}

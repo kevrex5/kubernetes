@@ -1,0 +1,148 @@
+# Vector Default - Full Configuration Example
+# ============================================
+# This file contains all available configuration options with descriptions.
+# Copy this file to values.yaml and customize as needed.
+
+# -- Override the chart name
+nameOverride: ""
+
+# -- Override the full release name
+fullnameOverride: ""
+
+# -- Number of Vector replicas
+replicaCount: 1
+
+# Container image configuration
+image:
+  # -- Vector image repository
+  repository: timberio/vector
+  # -- Vector image tag (defaults to Chart.appVersion if not set)
+  tag: "0.35.0"
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+# - name: my-registry-secret
+
+# Service configuration
+service:
+  # -- Kubernetes service type (ClusterIP, LoadBalancer, NodePort)
+  type: ClusterIP
+  # -- Syslog listener port
+  syslogPort: 514
+  # -- HTTP listener port for receiving JSON events
+  httpPort: 8080
+  # -- Optional service annotations (e.g., for cloud load balancers)
+  annotations: {}
+  # Example for AWS NLB:
+  # service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+# Vector API configuration (for health checks and metrics)
+vectorApi:
+  # -- Enable Vector's GraphQL API
+  enabled: true
+  # -- API listen address
+  address: "0.0.0.0:8686"
+
+# Container resource limits and requests
+resources:
+  requests:
+    # -- CPU request
+    cpu: 100m
+    # -- Memory request
+    memory: 128Mi
+  limits:
+    # -- CPU limit
+    cpu: 500m
+    # -- Memory limit
+    memory: 512Mi
+
+# Pod security context (applies to all containers)
+podSecurityContext:
+  # -- Group ID for volume mounts
+  fsGroup: 1000
+  # -- Require non-root user
+  runAsNonRoot: true
+  # -- User ID to run as
+  runAsUser: 1000
+
+# Container security context
+securityContext:
+  # -- Prevent privilege escalation
+  allowPrivilegeEscalation: false
+  # -- Require non-root user
+  runAsNonRoot: true
+  # -- User ID to run as
+  runAsUser: 1000
+  # -- Linux capabilities to drop
+  capabilities:
+    drop:
+      - ALL
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /health
+    port: api
+  # -- Initial delay before probing
+  initialDelaySeconds: 10
+  # -- Probe interval
+  periodSeconds: 15
+  # -- Probe timeout
+  timeoutSeconds: 5
+  # -- Failures before marking unhealthy
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /health
+    port: api
+  # -- Initial delay before probing
+  initialDelaySeconds: 5
+  # -- Probe interval
+  periodSeconds: 10
+  # -- Probe timeout
+  timeoutSeconds: 5
+  # -- Failures before marking unready
+  failureThreshold: 3
+
+# -- Node selector for pod scheduling
+nodeSelector: {}
+# Example:
+# kubernetes.io/os: linux
+
+# -- Tolerations for pod scheduling
+tolerations: []
+# Example:
+# - key: "node-role.kubernetes.io/master"
+#   operator: "Exists"
+#   effect: "NoSchedule"
+
+# -- Affinity rules for pod scheduling
+affinity: {}
+# Example pod anti-affinity:
+# podAntiAffinity:
+#   preferredDuringSchedulingIgnoredDuringExecution:
+#   - weight: 100
+#     podAffinityTerm:
+#       labelSelector:
+#         matchLabels:
+#           app.kubernetes.io/name: vector-default
+#       topologyKey: kubernetes.io/hostname
+
+# -- Additional pod annotations
+podAnnotations: {}
+# Example:
+# prometheus.io/scrape: "true"
+# prometheus.io/port: "8686"
+
+# Service account configuration
+serviceAccount:
+  # -- Create a service account
+  create: true
+  # -- Annotations for the service account
+  annotations: {}
+  # -- Service account name (auto-generated if not set)
+  name: ""

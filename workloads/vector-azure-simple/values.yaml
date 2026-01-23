@@ -1,0 +1,116 @@
+# Vector Azure Simple - Single Destination Configuration
+# ======================================================
+# Syslog TLS ingestion with forwarding to single Azure Log Analytics workspace
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  repository: timberio/vector
+  tag: "0.35.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 6514
+  annotations: {}
+
+# TLS configuration for syslog ingestion
+tls:
+  # Name of existing Kubernetes TLS secret
+  secretName: "vector-tls"
+
+# Azure Log Analytics configuration
+azure:
+  # Name of existing Kubernetes secret containing the DCR token
+  tokenSecretName: "azure-log-analytics"
+  # Key in the secret containing the bearer token
+  tokenSecretKey: "token"
+  # Data Collection Rule endpoint URI
+  # Format: https://<DCE>.ingest.monitor.azure.com/dataCollectionRules/<DCR-ID>/streams/<Stream>?api-version=2023-01-01
+  dcrUri: "https://example-dce.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-xxxxxxxx/streams/Custom-MyLogs_CL?api-version=2023-01-01"
+
+# HTTP sink configuration
+http:
+  concurrency: 4
+  timeoutSeconds: 30
+  compression: "gzip"
+  batchMaxBytes: 900000
+  batchTimeoutSeconds: 1
+
+# Buffer configuration
+buffer:
+  type: "disk"
+  maxSizeBytes: 10737418240  # 10GB
+  whenFull: "block"
+
+# Persistence for disk buffer
+persistence:
+  enabled: true
+  size: "20Gi"
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+
+# Vector API for health checks
+vectorApi:
+  enabled: true
+  address: "0.0.0.0:8686"
+
+# Resources
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Security contexts
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: api
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: api
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
