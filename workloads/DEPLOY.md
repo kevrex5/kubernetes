@@ -2,6 +2,36 @@
 
 Quick reference for deploying Vector syslog collectors to Kubernetes via ArgoCD.
 
+## Environment Variables
+
+Set these variables for your environment:
+
+```bash
+# Core configuration
+export VECTOR_NAMESPACE="rex5-cc-mz-k8s-vector"
+export ARGOCD_NAMESPACE="rex5-cc-mz-k8s-argocd"
+export GIT_REPO="git@github.com:kevrex5/kubernetes.git"
+export GIT_BRANCH="main"
+
+# Secrets
+export TLS_SECRET_NAME="vector-syslog-tls"
+export AZURE_TOKEN_SECRET="azure-ingest-token"
+
+# Azure resources
+export AZURE_DCE_NAME="dce-prod"
+export AZURE_DCE_REGION="eastus-1"
+export AZURE_DCR_NAME="dcr-syslog-prod"
+export AZURE_DCR_RG="rex5-cc-mz-prod-rg"
+export AZURE_TABLE_NAME="SyslogCEF"
+
+# Storage
+export STORAGE_CLASS="managed-csi-premium"
+export LB_RESOURCE_GROUP="rex5-cc-mz-prod-publicip-rg"
+
+# App names
+export VECTOR_APP_NAME="vector-azure-simple"  # or vector-claude, vector-default
+```
+
 ## Charts Overview
 
 | Chart | Purpose | Key Features |
@@ -23,29 +53,36 @@ All charts need secrets created **before** deployment:
 
 ```bash
 # Create namespace
-kubectl create namespace rex5-cc-mz-k8s-vector
+kubectl create namespace $VECTOR_NAMESPACE
 
 # TLS certificate for syslog ingestion (not needed for vector-default)
-kubectl create secret tls vector-syslog-tls \
+kubectl create secret tls $TLS_SECRET_NAME \
   --cert=/path/to/server.crt \
   --key=/path/to/server.key \
-  -n rex5-cc-mz-k8s-vector
+  -n $VECTOR_NAMESPACE
 
 # Azure DCR ingestion token
-kubectl create secret generic azure-ingest-token \
+kubectl create secret generic $AZURE_TOKEN_SECRET \
   --from-literal=token='eyJ0eXAiOiJKV1...' \
-  -n rex5-cc-mz-k8s-vector
+  -n $VECTOR_NAMESPACE
 ```
 
 **Getting Azure DCR Token:**
 ```bash
+# Set Azure credentials
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_CLIENT_SECRET="your-client-secret"
+
 # Generate token for Data Collection Endpoint (DCE)
 az login
-TENANT_ID=$(az account show --query tenantId -o tsv)
-az rest --method POST \
+export TENANT_ID=$(az account show --query tenantId -o tsv)
+export AZURE_TOKEN=$(az rest --method POST \
   --url "https://login.microsoftonline.com/$TENANT_ID/oauth2/v2.0/token" \
   --headers "Content-Type=application/x-www-form-urlencoded" \
-  --body "client_id=YOUR_CLIENT_ID&scope=https://monitor.azure.com/.default&client_secret=YOUR_CLIENT_SECRET&grant_type=client_credentials"
+  --body "client_id=${AZURE_CLIENT_ID}&scope=https://monitor.azure.com/.default&client_secret=${AZURE_CLIENT_SECRET}&grant_type=client_credentials" \
+  --query access_token -o tsv)
+
+echo "Token: $AZURE_TOKEN"
 ```
 
 ### 2. Azure DCR Setup
@@ -60,10 +97,11 @@ az rest --method POST \
 ```bash
 # Format: https://<DCE>.ingest.monitor.azure.com/dataCollectionRules/<DCR-ID>/streams/<Stream>?api-version=2023-01-01
 
-DCE_ENDPOINT=$(az monitor data-collection endpoint show -n <DCE_NAME> -g <RG> --query logsIngestion.endpoint -o tsv)
-DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -n <DCR_NAME> -g <RG> --query immutableId -o tsv)
+export DCE_ENDPOINT=$(az monitor data-collection endpoint show -n $AZURE_DCE_NAME -g $AZURE_DCR_RG --query logsIngestion.endpoint -o tsv)
+export DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -n $AZURE_DCR_NAME -g $AZURE_DCR_RG --query immutableId -o tsv)
+export DCR_URI="${DCE_ENDPOINT}/dataCollectionRules/${DCR_IMMUTABLE_ID}/streams/Custom-${AZURE_TABLE_NAME}_CL?api-version=2023-01-01"
 
-echo "${DCE_ENDPOINT}/dataCollectionRules/${DCR_IMMUTABLE_ID}/streams/Custom-<TableName>_CL?api-version=2023-01-01"
+echo "DCR URI: $DCR_URI"
 ```
 
 ---
@@ -74,32 +112,33 @@ echo "${DCE_ENDPOINT}/dataCollectionRules/${DCR_IMMUTABLE_ID}/streams/Custom-<Ta
 
 Create Application manifest in your GitOps repo:
 
-```yaml
-# argocd/apps/vector-azure-simple.yaml
+```bash
+# Generate Application manifest
+cat <<EOF | kubectl apply -f -
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: vector-azure-simple
-  namespace: rex5-cc-mz-k8s-argocd
+  name: $VECTOR_APP_NAME
+  namespace: $ARGOCD_NAMESPACE
 spec:
   project: platform
   source:
-    repoURL: git@github.com:kevrex5/kubernetes.git
-    targetRevision: main
-    path: workloads/vector-azure-simple
+    repoURL: $GIT_REPO
+    targetRevision: $GIT_BRANCH
+    path: workloads/$VECTOR_APP_NAME
     helm:
       valueFiles:
         - values.yaml
       parameters:
         - name: azure.dcrUri
-          value: "https://dce-prod.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-xxx/streams/Custom-SyslogCEF_CL?api-version=2023-01-01"
+          value: "$DCR_URI"
         - name: service.type
           value: LoadBalancer
         - name: persistence.storageClassName
-          value: managed-csi-premium
+          value: $STORAGE_CLASS
   destination:
     server: https://kubernetes.default.svc
-    namespace: rex5-cc-mz-k8s-vector
+    namespace: $VECTOR_NAMESPACE
   syncPolicy:
     automated:
       prune: true
@@ -107,30 +146,29 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-```
+EOF
 
-**Apply:**
-```bash
-kubectl apply -f argocd/apps/vector-azure-simple.yaml
-argocd app sync vector-azure-simple
+# Sync application
+argocd app sync $VECTOR_APP_NAME
 ```
 
 ### Option 2: ArgoCD CLI
 
 ```bash
-argocd app create vector-azure-simple \
+argocd app create $VECTOR_APP_NAME \
   --project platform \
-  --repo git@github.com:kevrex5/kubernetes.git \
-  --path workloads/vector-azure-simple \
-  --dest-namespace rex5-cc-mz-k8s-vector \
+  --repo $GIT_REPO \
+  --path workloads/$VECTOR_APP_NAME \
+  --dest-namespace $VECTOR_NAMESPACE \
   --dest-server https://kubernetes.default.svc \
-  --helm-set azure.dcrUri="https://dce.ingest.monitor.azure.com/..." \
+  --helm-set azure.dcrUri="$DCR_URI" \
   --helm-set service.type=LoadBalancer \
+  --helm-set persistence.storageClassName=$STORAGE_CLASS \
   --sync-policy automated \
   --auto-prune \
   --self-heal
 
-argocd app sync vector-azure-simple
+argocd app sync $VECTOR_APP_NAME
 ```
 
 ---
@@ -139,21 +177,22 @@ argocd app sync vector-azure-simple
 
 ### vector-azure-simple (Single DCR)
 
-```yaml
-# Custom values for production
+```bash
+# Create custom values file
+cat <<EOF > /tmp/vector-prod-values.yaml
 azure:
-  dcrUri: "https://dce-prod.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-abc123/streams/Custom-SyslogCEF_CL?api-version=2023-01-01"
-  tokenSecretName: "azure-ingest-token"
+  dcrUri: "$DCR_URI"
+  tokenSecretName: "$AZURE_TOKEN_SECRET"
   tokenSecretKey: "token"
 
 service:
   type: LoadBalancer
   annotations:
-    service.beta.kubernetes.io/azure-load-balancer-resource-group: "rex5-cc-mz-prod-publicip-rg"
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "$LB_RESOURCE_GROUP"
 
 persistence:
   size: "50Gi"
-  storageClassName: "managed-csi-premium"
+  storageClassName: "$STORAGE_CLASS"
 
 resources:
   requests:
@@ -168,18 +207,25 @@ tolerations:
     operator: Equal
     value: spot
     effect: NoSchedule
+EOF
+
+cat /tmp/vector-prod-values.yaml
 ```
 
 ### vector-claude (Dual DCR with Aggregation)
 
-```yaml
-# CEF aggregation with dual DCR forwarding
+```bash
+# Set secondary DCR (optional for dual setup)
+export DCR_URI_2="${DCE_ENDPOINT}/dataCollectionRules/${DCR_IMMUTABLE_ID}/streams/Custom-${AZURE_TABLE_NAME}_CL?api-version=2023-01-01"
+
+# Create custom values file
+cat <<EOF > /tmp/vector-claude-values.yaml
 dcr:
   dcr1:
-    uri: "https://dce1.eastus.ingest.monitor.azure.com/dataCollectionRules/dcr-primary/streams/Custom-CEF_CL?api-version=2023-01-01"
+    uri: "$DCR_URI"
     name: "dcr-primary"
   dcr2:
-    uri: "https://dce2.westus.ingest.monitor.azure.com/dataCollectionRules/dcr-secondary/streams/Custom-CEF_CL?api-version=2023-01-01"
+    uri: "$DCR_URI_2"
     name: "dcr-secondary"
 
 service:
@@ -190,6 +236,7 @@ buffer:
 
 persistence:
   size: "100Gi"  # Larger for high-volume CEF logs
+  storageClassName: "$STORAGE_CLASS"
 
 resources:
   requests:
@@ -198,6 +245,15 @@ resources:
   limits:
     cpu: 4000m
     memory: 4Gi
+
+tolerations:
+  - key: kubernetes.azure.com/scalesetpriority
+    operator: Equal
+    value: spot
+    effect: NoSchedule
+EOF
+
+cat /tmp/vector-claude-values.yaml
 ```
 
 ---
@@ -208,23 +264,23 @@ resources:
 
 ```bash
 # ArgoCD sync status
-argocd app get vector-azure-simple
+argocd app get $VECTOR_APP_NAME
 
 # Pod status
-kubectl get pods -n rex5-cc-mz-k8s-vector -l app.kubernetes.io/name=vector-azure-simple
+kubectl get pods -n $VECTOR_NAMESPACE -l app.kubernetes.io/name=$VECTOR_APP_NAME
 
 # Service and LoadBalancer IP
-kubectl get svc -n rex5-cc-mz-k8s-vector
+kubectl get svc -n $VECTOR_NAMESPACE
 
 # Logs
-kubectl logs -n rex5-cc-mz-k8s-vector -l app.kubernetes.io/name=vector-azure-simple -f --tail=100
+kubectl logs -n $VECTOR_NAMESPACE -l app.kubernetes.io/name=$VECTOR_APP_NAME -f --tail=100
 ```
 
 ### Test Syslog Ingestion
 
 **Get LoadBalancer IP:**
 ```bash
-LB_IP=$(kubectl get svc -n rex5-cc-mz-k8s-vector -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+export LB_IP=$(kubectl get svc -n $VECTOR_NAMESPACE -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 echo "Vector syslog endpoint: $LB_IP:6514"
 ```
 
@@ -248,7 +304,11 @@ echo '<134>Jan 23 12:00:00 testhost testapp: Test message' | nc $LB_IP 514
 
 ```bash
 # Port-forward Vector API
-kubectl port-forward -n rex5-cc-mz-k8s-vector svc/vector-azure-simple 8686:8686
+kubectl port-forward -n $VECTOR_NAMESPACE svc/$VECTOR_APP_NAME 8686:8686 &
+export PF_PID=$!
+
+# Wait for port-forward
+sleep 2
 
 # Health endpoint
 curl http://localhost:8686/health
@@ -258,6 +318,9 @@ curl http://localhost:8686/metrics | grep vector_
 
 # Configuration (introspection)
 curl http://localhost:8686/config
+
+# Stop port-forward
+kill $PF_PID 2>/dev/null
 ```
 
 ---
@@ -267,52 +330,59 @@ curl http://localhost:8686/config
 ### Pod Not Starting
 
 ```bash
+# Get pod name
+export POD_NAME=$(kubectl get pods -n $VECTOR_NAMESPACE -l app.kubernetes.io/name=$VECTOR_APP_NAME -o jsonpath='{.items[0].metadata.name}')
+
 # Check events
-kubectl describe pod -n rex5-cc-mz-k8s-vector <pod-name>
+kubectl describe pod -n $VECTOR_NAMESPACE $POD_NAME
 
 # Common issues:
 # 1. Missing secrets
-kubectl get secrets -n rex5-cc-mz-k8s-vector
+kubectl get secrets -n $VECTOR_NAMESPACE
 
 # 2. PVC not binding
-kubectl get pvc -n rex5-cc-mz-k8s-vector
-kubectl describe pvc -n rex5-cc-mz-k8s-vector <pvc-name>
+kubectl get pvc -n $VECTOR_NAMESPACE
+export PVC_NAME=$(kubectl get pvc -n $VECTOR_NAMESPACE -o jsonpath='{.items[0].metadata.name}')
+kubectl describe pvc -n $VECTOR_NAMESPACE $PVC_NAME
 
 # 3. Image pull errors
-kubectl get events -n rex5-cc-mz-k8s-vector --sort-by='.lastTimestamp' | tail -20
+kubectl get events -n $VECTOR_NAMESPACE --sort-by='.lastTimestamp' | tail -20
 ```
 
 ### No Events Reaching Azure
 
 ```bash
 # 1. Check Vector logs for errors
-kubectl logs -n rex5-cc-mz-k8s-vector <pod-name> | grep -i error
+kubectl logs -n $VECTOR_NAMESPACE $POD_NAME | grep -i error
 
 # 2. Check sink status (Vector internal metrics)
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- curl -s localhost:8686/metrics | grep -E 'component_sent_events_total|component_errors_total'
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- curl -s localhost:8686/metrics | grep -E 'component_sent_events_total|component_errors_total'
 
 # 3. Verify DCR URI is correct
-kubectl get configmap -n rex5-cc-mz-k8s-vector -o yaml | grep dcrUri
+kubectl get configmap -n $VECTOR_NAMESPACE -o yaml | grep -i uri
 
 # 4. Test Azure connectivity
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- curl -v -H "Authorization: Bearer $TOKEN" https://<dce>.ingest.monitor.azure.com/
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- curl -v -H "Authorization: Bearer $AZURE_TOKEN" ${DCE_ENDPOINT}/
 
 # 5. Check token validity
-kubectl get secret azure-ingest-token -n rex5-cc-mz-k8s-vector -o jsonpath='{.data.token}' | base64 -d | cut -c1-20
+export TOKEN_PREVIEW=$(kubectl get secret $AZURE_TOKEN_SECRET -n $VECTOR_NAMESPACE -o jsonpath='{.data.token}' | base64 -d | cut -c1-20)
+echo "Token preview: ${TOKEN_PREVIEW}..."
 ```
 
 ### TLS Connection Failures
 
 ```bash
 # 1. Verify certificate exists and is valid
-kubectl get secret vector-syslog-tls -n rex5-cc-mz-k8s-vector -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text | grep -E 'Subject:|Not After'
+kubectl get secret $TLS_SECRET_NAME -n $VECTOR_NAMESPACE -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text | grep -E 'Subject:|Not After'
 
 # 2. Test TLS handshake
 openssl s_client -connect $LB_IP:6514 -showcerts
 
 # 3. Check certificate matches key
-kubectl get secret vector-syslog-tls -n rex5-cc-mz-k8s-vector -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -modulus | md5sum
-kubectl get secret vector-syslog-tls -n rex5-cc-mz-k8s-vector -o jsonpath='{.data.tls\.key}' | base64 -d | openssl rsa -noout -modulus | md5sum
+export CERT_HASH=$(kubectl get secret $TLS_SECRET_NAME -n $VECTOR_NAMESPACE -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -modulus | md5sum)
+export KEY_HASH=$(kubectl get secret $TLS_SECRET_NAME -n $VECTOR_NAMESPACE -o jsonpath='{.data.tls\.key}' | base64 -d | openssl rsa -noout -modulus | md5sum)
+echo "Cert hash: $CERT_HASH"
+echo "Key hash:  $KEY_HASH"
 # Should produce same hash
 ```
 
@@ -320,78 +390,81 @@ kubectl get secret vector-syslog-tls -n rex5-cc-mz-k8s-vector -o jsonpath='{.dat
 
 ```bash
 # 1. Check buffer disk usage
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- df -h /var/lib/vector
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- df -h /var/lib/vector
 
 # 2. Check PVC size
-kubectl get pvc -n rex5-cc-mz-k8s-vector -o custom-columns=NAME:.metadata.name,SIZE:.spec.resources.requests.storage,USED:.status.capacity.storage
+kubectl get pvc -n $VECTOR_NAMESPACE -o custom-columns=NAME:.metadata.name,SIZE:.spec.resources.requests.storage,USED:.status.capacity.storage
 
 # 3. Increase buffer size (edit values)
 # Edit persistence.size in values.yaml or via ArgoCD parameter
 
 # 4. Check for backpressure (events buffering)
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- curl -s localhost:8686/metrics | grep buffer_events
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- curl -s localhost:8686/metrics | grep buffer_events
 
 # 5. Temporary: Clear buffer (DESTRUCTIVE)
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- rm -rf /var/lib/vector/*
-kubectl delete pod -n rex5-cc-mz-k8s-vector <pod-name>  # Let it recreate
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- rm -rf /var/lib/vector/*
+kubectl delete pod -n $VECTOR_NAMESPACE $POD_NAME  # Let it recreate
 ```
 
 ### Performance Issues / Slow Forwarding
 
 ```bash
 # 1. Check sink throughput
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- curl -s localhost:8686/metrics | grep -E 'component_sent_events_total|component_sent_bytes_total'
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- curl -s localhost:8686/metrics | grep -E 'component_sent_events_total|component_sent_bytes_total'
 
 # 2. Check for throttling (429 errors from Azure)
-kubectl logs -n rex5-cc-mz-k8s-vector <pod-name> | grep -i "429\|throttl\|rate limit"
+kubectl logs -n $VECTOR_NAMESPACE $POD_NAME | grep -i "429\|throttl\|rate limit"
 
 # 3. Increase concurrency (edit values)
 # http.concurrency: 4 → 8 (vector-azure-simple)
 # Or adjust batching: http.batchTimeoutSeconds: 1 → 0.5
 
 # 4. Check resource limits
-kubectl top pod -n rex5-cc-mz-k8s-vector
+kubectl top pod -n $VECTOR_NAMESPACE
 
 # 5. Scale replicas (for high volume)
 # Note: Syslog requires sticky sessions or external LB with consistent hashing
-kubectl scale deployment -n rex5-cc-mz-k8s-vector vector-azure-simple --replicas=2
+export DEPLOYMENT_NAME=$(kubectl get deployment -n $VECTOR_NAMESPACE -o jsonpath='{.items[0].metadata.name}')
+kubectl scale deployment -n $VECTOR_NAMESPACE $DEPLOYMENT_NAME --replicas=2
 ```
 
 ### Parsing Errors (vector-claude)
 
 ```bash
 # 1. Check for CEF parse errors
-kubectl logs -n rex5-cc-mz-k8s-vector <pod-name> | grep -i "cef_parse_error"
+kubectl logs -n $VECTOR_NAMESPACE $POD_NAME | grep -i "cef_parse_error"
 
 # 2. View raw messages that failed to parse
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- curl -s localhost:8686/tap/parse_cef -X POST | jq '.parse_status, .cef_parse_error'
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- curl -s localhost:8686/tap/parse_cef -X POST | jq '.parse_status, .cef_parse_error'
 
 # 3. Test CEF parsing locally
 # Use test/vector-local.yaml for local Vector instance
-docker run -it --rm -v $(pwd)/test:/test timberio/vector:0.35.0 \
-  --config /test/vector-local.yaml < test/test-messages.txt
+export VECTOR_VERSION="0.35.0"
+docker run -it --rm -v $(pwd)/workloads/vector-claude/test:/test timberio/vector:$VECTOR_VERSION \
+  --config /test/vector-local.yaml < workloads/vector-claude/test/test-messages.txt
 ```
 
 ### ArgoCD Sync Issues
 
 ```bash
 # 1. Check sync status and errors
-argocd app get vector-azure-simple
+argocd app get $VECTOR_APP_NAME
 
 # 2. View diff between Git and cluster
-argocd app diff vector-azure-simple
+argocd app diff $VECTOR_APP_NAME
 
 # 3. Force hard refresh
-argocd app get vector-azure-simple --hard-refresh
+argocd app get $VECTOR_APP_NAME --hard-refresh
 
 # 4. Retry failed sync
-argocd app sync vector-azure-simple --force
+argocd app sync $VECTOR_APP_NAME --force
 
 # 5. View sync history
-argocd app history vector-azure-simple
+argocd app history $VECTOR_APP_NAME
 
-# 6. Rollback to previous revision
-argocd app rollback vector-azure-simple <revision>
+# 6. Rollback to previous revision (get revision number from history first)
+export PREVIOUS_REVISION=$(argocd app history $VECTOR_APP_NAME -o json | jq -r '.[1].id')
+argocd app rollback $VECTOR_APP_NAME $PREVIOUS_REVISION
 ```
 
 ---
@@ -402,21 +475,23 @@ argocd app rollback vector-azure-simple <revision>
 
 Vector exposes Prometheus metrics on port 8686:
 
-```yaml
-# ServiceMonitor for Prometheus Operator
+```bash
+# Create ServiceMonitor for Prometheus Operator
+cat <<EOF | kubectl apply -f -
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: vector-metrics
-  namespace: rex5-cc-mz-k8s-vector
+  namespace: $VECTOR_NAMESPACE
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: vector-azure-simple
+      app.kubernetes.io/name: $VECTOR_APP_NAME
   endpoints:
     - port: api
       path: /metrics
       interval: 30s
+EOF
 ```
 
 **Key metrics to monitor:**
@@ -472,35 +547,38 @@ argocd app sync vector-azure-simple
 ### Rotate TLS Certificate
 
 ```bash
-# 1. Create new secret with updated cert
-kubectl create secret tls vector-syslog-tls-new \
-  --cert=new-server.crt \
-  --key=new-server.key \
-  -n rex5-cc-mz-k8s-vector
+# 1. Backup existing secret (optional)
+kubectl get secret $TLS_SECRET_NAME -n $VECTOR_NAMESPACE -o yaml > /tmp/tls-secret-backup.yaml
 
-# 2. Update values to use new secret name
-# Or replace existing secret:
-kubectl delete secret vector-syslog-tls -n rex5-cc-mz-k8s-vector
-kubectl create secret tls vector-syslog-tls \
-  --cert=new-server.crt \
-  --key=new-server.key \
-  -n rex5-cc-mz-k8s-vector
+# 2. Replace existing secret
+kubectl delete secret $TLS_SECRET_NAME -n $VECTOR_NAMESPACE
+kubectl create secret tls $TLS_SECRET_NAME \
+  --cert=/path/to/new-server.crt \
+  --key=/path/to/new-server.key \
+  -n $VECTOR_NAMESPACE
 
 # 3. Restart pods to load new cert
-kubectl rollout restart deployment -n rex5-cc-mz-k8s-vector
+kubectl rollout restart deployment -n $VECTOR_NAMESPACE
+kubectl rollout status deployment -n $VECTOR_NAMESPACE
 ```
 
 ### Backup & Recovery
 
 ```bash
 # Backup Vector data directory (buffer)
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- tar czf - /var/lib/vector > vector-backup-$(date +%Y%m%d).tar.gz
+export BACKUP_DATE=$(date +%Y%m%d-%H%M%S)
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- tar czf - /var/lib/vector > /tmp/vector-backup-${BACKUP_DATE}.tar.gz
+echo "Backup saved to: /tmp/vector-backup-${BACKUP_DATE}.tar.gz"
 
 # Backup PVC with Velero (if installed)
-velero backup create vector-pvc-backup --include-namespaces rex5-cc-mz-k8s-vector --include-resources pvc,pv
+velero backup create vector-pvc-backup-${BACKUP_DATE} \
+  --include-namespaces $VECTOR_NAMESPACE \
+  --include-resources pvc,pv
 
 # Restore from backup
-kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- tar xzf - -C / < vector-backup-20260123.tar.gz
+export RESTORE_FILE="/tmp/vector-backup-20260123-120000.tar.gz"
+kubectl exec -n $VECTOR_NAMESPACE $POD_NAME -- tar xzf - -C / < $RESTORE_FILE
+kubectl delete pod -n $VECTOR_NAMESPACE $POD_NAME  # Restart to apply
 ```
 
 ---
@@ -510,18 +588,28 @@ kubectl exec -n rex5-cc-mz-k8s-vector <pod-name> -- tar xzf - -C / < vector-back
 For testing or non-GitOps environments:
 
 ```bash
+# Set release name
+export HELM_RELEASE="vector-${VECTOR_APP_NAME##*-}"  # e.g., vector-simple, vector-claude
+
 # Install
-helm install vector-azure ./workloads/vector-azure-simple -n rex5-cc-mz-k8s-vector \
-  --set azure.dcrUri="https://..." \
+helm install $HELM_RELEASE ./workloads/$VECTOR_APP_NAME -n $VECTOR_NAMESPACE \
+  --set azure.dcrUri="$DCR_URI" \
+  --set persistence.storageClassName="$STORAGE_CLASS" \
   --create-namespace
 
-# Upgrade
-helm upgrade vector-azure ./workloads/vector-azure-simple -n rex5-cc-mz-k8s-vector \
-  --set azure.dcrUri="https://..."
+# Upgrade with custom values
+helm upgrade $HELM_RELEASE ./workloads/$VECTOR_APP_NAME -n $VECTOR_NAMESPACE \
+  -f /tmp/vector-prod-values.yaml
 
-# Rollback
-helm rollback vector-azure -n rex5-cc-mz-k8s-vector
+# Show current values
+helm get values $HELM_RELEASE -n $VECTOR_NAMESPACE
+
+# Rollback to previous release
+helm rollback $HELM_RELEASE -n $VECTOR_NAMESPACE
+
+# List releases
+helm list -n $VECTOR_NAMESPACE
 
 # Uninstall
-helm uninstall vector-azure -n rex5-cc-mz-k8s-vector
+helm uninstall $HELM_RELEASE -n $VECTOR_NAMESPACE
 ```
