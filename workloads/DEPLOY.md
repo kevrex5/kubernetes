@@ -613,3 +613,75 @@ helm list -n $VECTOR_NAMESPACE
 # Uninstall
 helm uninstall $HELM_RELEASE -n $VECTOR_NAMESPACE
 ```
+
+---
+
+## ArgoCD Best Practices & Drift Prevention
+
+**Follow these rules to ensure your cluster stays in sync with Git and avoid configuration drift:**
+
+### 1. Git is the Source of Truth
+- **Never** apply resources directly with `kubectl apply`, `kubectl edit`, or `helm install/upgrade`.
+- All changes must go through Git and be reconciled by ArgoCD.
+
+### 2. Automated Sync, Prune, and Self-Heal
+- Use `syncPolicy.automated.prune: true` and `selfHeal: true` in all ArgoCD Application specs:
+
+```yaml
+syncPolicy:
+  automated:
+    prune: true        # Delete resources not in Git
+    selfHeal: true     # Revert manual changes in cluster
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+```
+
+- This ensures ArgoCD will:
+  - Automatically sync changes from Git
+  - Delete orphaned resources
+  - Overwrite any manual changes in the cluster
+
+### 3. Detecting and Resolving Drift
+- Use `argocd app diff <app>` to see differences between Git and cluster
+- Use `argocd app sync <app> --force` to force reconciliation
+- Use `argocd app history <app>` and `argocd app rollback <app> <revision>` to revert to a previous state
+- If you must make a manual change (emergency only), document it and immediately restore desired state in Git
+
+### 4. Sync Waves and Dependency Ordering
+- Use `argocd.argoproj.io/sync-wave` annotations to control resource apply order (e.g., namespaces before apps)
+- Example:
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+```
+
+### 5. Ignore Differences for Volatile Fields
+- Use `ignoreDifferences` in Application spec to avoid false drift on fields like webhook caBundle, status, etc.
+- Example:
+```yaml
+ignoreDifferences:
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    jsonPointers:
+      - /webhooks/0/clientConfig/caBundle
+```
+
+### 6. Health Checks and Monitoring
+- Use ArgoCD's health status and `argocd app get <app>` to monitor sync and health
+- Integrate with Prometheus/Grafana for alerting on OutOfSync or Degraded status
+
+### 7. Policy Reminders
+- All configuration must be in `values.yaml` or manifests in Git
+- No secrets in Git: use External Secrets Operator and Azure Key Vault
+- Pin all chart and image versions
+- Document all manual interventions in `logs/commands/` and `logs/problems/`
+
+### 8. Recovery and Rollback
+- Use `git revert` and ArgoCD sync to roll back changes
+- If ArgoCD is blocked, document the incident and restore desired state via PR
+
+**Reference:** See AGENTS.md in the repo for the full GitOps operating manual and critical rules.
+
+---
