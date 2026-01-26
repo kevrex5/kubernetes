@@ -1,0 +1,22 @@
+# Test values for Vector Azure Simple
+# =====================================
+# Uses the DCR created by Terraform in test/terraform/
+
+azure:
+  authMethod: "workloadIdentity"
+  tokenRefreshSeconds: 1800  # 30 minutes
+  dcrUri: "https://dcr-vector-cef-test-rybg-canadacentral.logs.z1.ingest.monitor.azure.com/dataCollectionRules/dcr-05643141f9d04202b890e4d027c9b29c/streams/Custom-VectorCEF?api-version=2023-01-01"
+
+# Use smaller buffer for testing
+buffer:
+  type: "memory"
+  maxSizeBytes: 104857600  # 100MB
+
+persistence:
+  enabled: false
+
+# Service account must be annotated for Azure Workload Identity
+# Example annotation (set in your environment):
+# serviceAccount:
+#   annotations:
+#     azure.workload.identity/client-id: "<your-managed-identity-client-id>"

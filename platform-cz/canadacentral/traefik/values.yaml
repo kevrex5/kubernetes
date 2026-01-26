@@ -1,0 +1,155 @@
+# Traefik Helm Values for CZ Cluster with Gateway API
+# Chart: https://traefik.github.io/charts
+# Version: Pin in ArgoCD Application
+
+image:
+  tag: "v3.6.6"  # Pin to specific version
+
+# Disable IngressClass (we use Gateway API only)
+ingressClass:
+  enabled: false
+  isDefaultClass: false
+
+deployment:
+  replicas: 2  # Start with 2, increase based on load
+
+# Pod Anti-Affinity - spread pods across nodes
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - traefik
+          topologyKey: kubernetes.io/hostname
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Azure Load Balancer configuration
+service:
+  enabled: true
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  annotations:
+    # TODO: Update with CZ public IP resource group
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "<CZ_PUBLICIP_RESOURCE_GROUP>"
+    # TODO: Update with CZ public IP name
+    service.beta.kubernetes.io/azure-pip-name: "<CZ_PUBLICIP_NAME>"
+    # TODO: Update with CZ public IP address
+    service.beta.kubernetes.io/azure-load-balancer-ipv4: "<CZ_PUBLICIP_ADDRESS>"
+  spec:
+    # TODO: Update with CZ public IP address
+    loadBalancerIP: "<CZ_PUBLICIP_ADDRESS>"
+
+# Port configuration
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+    expose:
+      default: true
+  websecure:
+    port: 8443
+    exposedPort: 443
+    expose:
+      default: true
+  metrics:
+    port: 9100
+    expose:
+      default: false
+    exposedPort: 9100
+
+# Security context
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+# Resource limits
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Tolerations for spot instances and system pressures
+tolerations:
+  - key: kubernetes.azure.com/scalesetpriority
+    operator: Equal
+    value: spot
+    effect: NoSchedule
+  - key: node.kubernetes.io/disk-pressure
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/memory-pressure
+    operator: Exists
+    effect: NoSchedule
+
+# Additional arguments
+additionalArguments:
+  - --providers.kubernetescrd
+  - --providers.kubernetescrd.allowCrossNamespace=true
+  - --serversTransport.maxIdleConnsPerHost=200
+
+# Gateway API provider
+providers:
+  kubernetesGateway:
+    enabled: true
+    experimentalChannel: true
+
+# Enable built-in gateway (managed by Helm)
+gateway:
+  enabled: true
+  listeners:
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy: 
+        from: All  # Allow routes from all namespaces
+    websecure:
+      port: 8443
+      protocol: HTTPS
+      namespacePolicy:
+        from: All  # Allow routes from all namespaces
+      certificateRefs:
+        - name: wildcard-tls
+          kind: Secret
+
+gatewayClass:
+  enabled: true
+
+# Logging
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+    format: json
+
+# Prometheus metrics
+metrics:
+  prometheus:
+    enabled: true
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+
+# Default TLS certificate (wildcard)
+tlsStore:
+  default:
+    defaultCertificate:
+      secretName: wildcard-tls

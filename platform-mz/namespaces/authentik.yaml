@@ -1,0 +1,16 @@
+# Authentik Namespace
+# ===================
+# SSO/IdP platform component - uses baseline PSA (requires privileged operations)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rex5-cc-mz-k8s-authentik
+  labels:
+    # Pod Security Admission - baseline for platform components
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+    # Standard labels
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/component: identity
+    app.kubernetes.io/part-of: platform

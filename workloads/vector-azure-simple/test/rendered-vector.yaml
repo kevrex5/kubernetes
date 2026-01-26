@@ -1,0 +1,113 @@
+# Vector Azure Simple Configuration
+# ==================================
+# Syslog TLS ingestion with single Azure Log Analytics destination
+
+data_dir: /var/lib/vector
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
+  playground: false
+
+# =============================================================================
+# SOURCES
+# =============================================================================
+sources:
+  # Syslog over TLS on port 6514
+  syslog_tls:
+    type: socket
+    mode: tcp
+    address: "0.0.0.0:6514"
+    max_length: 102400
+    tls:
+      enabled: true
+      crt_file: /etc/vector/tls/tls.crt
+      key_file: /etc/vector/tls/tls.key
+    decoding:
+      codec: bytes
+
+# =============================================================================
+# TRANSFORMS
+# =============================================================================
+transforms:
+  # Parse syslog messages
+  parse_syslog:
+    type: remap
+    inputs:
+      - syslog_tls
+    source: |
+      # Try to parse syslog format
+      parsed, err = parse_syslog(.message)
+      if err != null {
+        # Keep original if parsing fails
+        .parse_error = err
+        .raw_message = .message
+      } else {
+        . = merge(., parsed)
+      }
+
+      # Add ingestion metadata
+      .meta.port_received = 6514
+      .meta.received_at = now()
+      .meta.vector_instance = get_hostname() ?? "unknown"
+
+  # Enrich events with additional context
+  enrich:
+    type: remap
+    inputs:
+      - parse_syslog
+    source: |
+      # Extract severity level for Azure
+      severity = to_int(.severity) ?? 6
+      .severity_label = if severity <= 2 {
+        "Critical"
+      } else if severity <= 4 {
+        "Error"
+      } else if severity == 5 {
+        "Warning"
+      } else {
+        "Information"
+      }
+
+      # Ensure timestamp exists
+      if !exists(.timestamp) {
+        .timestamp = now()
+      }
+
+      # Create TimeGenerated for Azure (required field)
+      .TimeGenerated = format_timestamp!(.timestamp, "%Y-%m-%dT%H:%M:%S%.fZ")
+
+# =============================================================================
+# SINKS
+# =============================================================================
+sinks:
+  # Azure Log Analytics via Data Collection Rule
+  azure_logs:
+    type: http
+    inputs:
+      - enrich
+    uri: "https://example-dce.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-xxxxxxxx/streams/Custom-MyLogs_CL?api-version=2023-01-01"
+    method: post
+    encoding:
+      codec: json
+    # Bearer token authentication
+    auth:
+      strategy: bearer
+      token: "${AZURE_DCR_TOKEN}"
+    headers:
+      Content-Type: "application/json"
+    compression: gzip
+    batch:
+      max_bytes: 900000
+      timeout_secs: 1
+    request:
+      concurrency: 4
+      timeout_secs: 30
+      retry_attempts: 5
+      retry_initial_backoff_secs: 1
+      retry_max_duration_secs: 300
+    buffer:
+      type: "disk"
+      max_size: 10737418240
+      when_full: "block"
+    healthcheck:
+      enabled: false

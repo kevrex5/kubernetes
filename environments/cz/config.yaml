@@ -1,0 +1,85 @@
+# =============================================================================
+# Centralized Environment Configuration - Customer Zone (CZ) Cluster
+# =============================================================================
+# This file contains all environment-specific values for the CZ cluster.
+# 
+# IMPORTANT: Update all <PLACEHOLDER> values before deploying!
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cz-environment-config
+  namespace: default
+  annotations:
+    config.kubernetes.io/local-config: "true"  # Prevents this from being applied to cluster
+data:
+  # ---------------------------------------------------------------------------
+  # Domain Configuration
+  # ---------------------------------------------------------------------------
+  DOMAIN: "cz.cc.rex5.ca"
+  WILDCARD_DOMAIN: "*.cz.cc.rex5.ca"
+  
+  # ---------------------------------------------------------------------------
+  # Git Repository (same as management zone)
+  # ---------------------------------------------------------------------------
+  GIT_REPO_URL: "https://github.com/kevrex5/kubernetes.git"
+  GIT_REPO_BRANCH: "main"
+  
+  # ---------------------------------------------------------------------------
+  # Azure Subscription & Tenant (same as MZ unless different)
+  # ---------------------------------------------------------------------------
+  AZURE_SUBSCRIPTION_ID: "<CZ_SUBSCRIPTION_ID>"  # TODO: Update
+  AZURE_TENANT_ID: "14021cba-cdc0-4c87-a145-b66f94b7017f"  # Same tenant
+  
+  # ---------------------------------------------------------------------------
+  # Azure Key Vault (CZ-specific)
+  # ---------------------------------------------------------------------------
+  KEYVAULT_NAME: "<CZ_KEYVAULT_NAME>"  # TODO: e.g., rex5-cc-cz-prod-kv
+  KEYVAULT_RESOURCE_GROUP: "<CZ_KEYVAULT_RG>"  # TODO: e.g., rex5-cc-cz-prod-keyvault-rg
+  KEYVAULT_URL: "https://<CZ_KEYVAULT_NAME>.vault.azure.net/"  # TODO: Update
+  
+  # ---------------------------------------------------------------------------
+  # Azure DNS Zone (for cert-manager ACME DNS-01)
+  # ---------------------------------------------------------------------------
+  # Option 1: Delegated zone cz.cc.rex5.ca in separate RG
+  # Option 2: Use same zone as MZ with selector
+  DNS_ZONE_NAME: "cz.cc.rex5.ca"  # TODO: Confirm
+  DNS_ZONE_RESOURCE_GROUP: "<CZ_DNS_ZONE_RG>"  # TODO: e.g., rex5-cc-cz-prod-dns-rg
+  
+  # ---------------------------------------------------------------------------
+  # Azure Public IP (for Traefik LoadBalancer)
+  # ---------------------------------------------------------------------------
+  PUBLICIP_ADDRESS: "<CZ_PUBLICIP_ADDRESS>"  # TODO: e.g., 20.x.x.x
+  PUBLICIP_NAME: "<CZ_PUBLICIP_NAME>"  # TODO: e.g., rex5-cc-cz-prod-pip
+  PUBLICIP_RESOURCE_GROUP: "<CZ_PUBLICIP_RG>"  # TODO: e.g., rex5-cc-cz-prod-publicip-rg
+  
+  # ---------------------------------------------------------------------------
+  # Managed Identities (Workload Identity for CZ cluster)
+  # ---------------------------------------------------------------------------
+  # cert-manager: DNS-01 challenge solver
+  # Create with: az identity create -g <RG> -n rex5-cc-cz-cert-manager-identity
+  # Then assign DNS Zone Contributor role on the DNS zone
+  CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID: "<CZ_CERT_MANAGER_IDENTITY_CLIENT_ID>"  # TODO
+  
+  # external-secrets: Key Vault access
+  # Create with: az identity create -g <RG> -n rex5-cc-cz-external-secrets-identity
+  # Then assign Key Vault Secrets User role on the Key Vault
+  ESO_MANAGED_IDENTITY_CLIENT_ID: "<CZ_ESO_IDENTITY_CLIENT_ID>"  # TODO
+  
+  # ---------------------------------------------------------------------------
+  # AKS Cluster (CZ)
+  # ---------------------------------------------------------------------------
+  AKS_CLUSTER_NAME: "<CZ_AKS_CLUSTER_NAME>"  # TODO: e.g., rex5-cc-cz-prod-aks
+  AKS_RESOURCE_GROUP: "<CZ_AKS_RG>"  # TODO: e.g., rex5-cc-cz-prod-aks-rg
+  AKS_NODE_RESOURCE_GROUP: "<CZ_AKS_NODE_RG>"  # TODO: e.g., MC_rex5-cc-cz-prod-aks-rg_...
+  
+  # ---------------------------------------------------------------------------
+  # Contact Information
+  # ---------------------------------------------------------------------------
+  ADMIN_EMAIL: "admin@rex5.ca"
+  
+  # ---------------------------------------------------------------------------
+  # Service Hostnames (derived from DOMAIN)
+  # ---------------------------------------------------------------------------
+  TRAEFIK_DASHBOARD_HOST: "traefik.cz.cc.rex5.ca"

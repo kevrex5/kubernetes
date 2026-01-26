@@ -20,7 +20,7 @@ spec:
   source:
     repoURL: git@github.com:kevrex5/kubernetes.git
     targetRevision: HEAD
-    path: platform/namespaces
+    path: platform-mz/namespaces
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -119,7 +119,7 @@ spec:
       targetRevision: 0.17.0  # Updated to support v1 API
       helm:
         valueFiles:
-          - $values/platform/external-secrets/values.yaml
+          - $values/platform-mz/external-secrets/values.yaml
     # Values from Git
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
@@ -127,7 +127,7 @@ spec:
     # ClusterSecretStores and other resources
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
-      path: platform/external-secrets
+      path: platform-mz/external-secrets
       directory:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
@@ -138,7 +138,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
       - ServerSideApply=true
     retry:
       limit: 5
@@ -178,7 +178,7 @@ spec:
       targetRevision: 38.0.2  # Pinned version
       helm:
         valueFiles:
-          - $values/platform/traefik/values.yaml
+          - $values/platform-mz/traefik/values.yaml
     # Values from Git
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
@@ -186,7 +186,7 @@ spec:
     # Gateway, ExternalSecret, NetworkPolicies
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
-      path: platform/traefik
+      path: platform-mz/traefik
       directory:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
@@ -197,7 +197,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
       - ServerSideApply=true
     retry:
       limit: 5
@@ -229,7 +229,7 @@ spec:
       targetRevision: 2025.12.1  # Pinned version
       helm:
         valueFiles:
-          - $values/platform/authentik/values.yaml
+          - $values/platform-mz/authentik/values.yaml
     # Values from Git
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
@@ -237,7 +237,7 @@ spec:
     # HTTPRoute, ExternalSecret, Blueprints (kustomize)
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
-      path: platform/authentik
+      path: platform-mz/authentik
   destination:
     server: https://kubernetes.default.svc
     namespace: rex5-cc-mz-k8s-authentik
@@ -246,7 +246,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
       - ServerSideApply=true
     retry:
       limit: 5
@@ -277,7 +277,7 @@ spec:
       targetRevision: 70.4.1  # Pinned version
       helm:
         valueFiles:
-          - $values/platform/monitoring/values.yaml
+          - $values/platform-mz/monitoring/values.yaml
         skipCrds: false
     # Values from Git
     - repoURL: git@github.com:kevrex5/kubernetes.git
@@ -286,7 +286,7 @@ spec:
     # HTTPRoutes, ExternalSecrets, NetworkPolicies (kustomize)
     - repoURL: git@github.com:kevrex5/kubernetes.git
       targetRevision: HEAD
-      path: platform/monitoring
+      path: platform-mz/monitoring
   destination:
     server: https://kubernetes.default.svc
     namespace: rex5-cc-mz-k8s-monitoring
@@ -295,7 +295,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
     retry:

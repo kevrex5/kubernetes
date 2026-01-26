@@ -68,12 +68,13 @@ data:
           - parse_syslog
         source: |
           # Extract severity level for Azure
-          .severity_label = if exists(.severity) {
-            severity = to_int(.severity) ?? 6
-            if severity <= 2 { "Critical" }
-            else if severity <= 4 { "Error" }
-            else if severity == 5 { "Warning" }
-            else { "Information" }
+          severity = to_int(.severity) ?? 6
+          .severity_label = if severity <= 2 {
+            "Critical"
+          } else if severity <= 4 {
+            "Error"
+          } else if severity == 5 {
+            "Warning"
           } else {
             "Information"
           }
@@ -100,6 +101,7 @@ data:
         encoding:
           codec: json
         # Bearer token authentication
+        # Token must be pre-fetched via OAuth2 and refreshed before expiry
         auth:
           strategy: bearer
           token: "${AZURE_DCR_TOKEN}"

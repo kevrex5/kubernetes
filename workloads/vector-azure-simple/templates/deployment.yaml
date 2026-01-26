@@ -20,6 +20,9 @@ spec:
         {{- end }}
       labels:
         {{- include "vector-azure-simple.labels" . | nindent 8 }}
+        {{- if eq .Values.azure.authMethod "workloadIdentity" }}
+        azure.workload.identity/use: "true"
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -28,20 +31,65 @@ spec:
       serviceAccountName: {{ include "vector-azure-simple.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if eq .Values.azure.authMethod "workloadIdentity" }}
+      # Init container to fetch initial token before Vector starts
+      initContainers:
+        - name: init-token
+          image: "{{ .Values.tokenRefresh.image.repository }}:{{ .Values.tokenRefresh.image.tag }}"
+          imagePullPolicy: {{ .Values.tokenRefresh.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Fetching initial Azure token..."
+              TOKEN=$(az account get-access-token --resource https://monitor.azure.com --query accessToken -o tsv)
+              if [ -z "$TOKEN" ]; then
+                echo "ERROR: Failed to get Azure token"
+                exit 1
+              fi
+              echo "$TOKEN" > /var/run/azure-token/token
+              echo "Token acquired successfully"
+          volumeMounts:
+            - name: azure-token
+              mountPath: /var/run/azure-token
+          resources:
+            {{- toYaml .Values.tokenRefresh.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      {{- end }}
       containers:
         - name: vector
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if eq .Values.azure.authMethod "workloadIdentity" }}
+          # Use wrapper script to read token from file
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Read token from shared volume and export as env var
+              export AZURE_DCR_TOKEN=$(cat /var/run/azure-token/token)
+              exec vector --config /etc/vector/vector.yaml
+          {{- else }}
           args:
             - --config
             - /etc/vector/vector.yaml
+          {{- end }}
           env:
-            # Azure DCR token from Kubernetes secret
+            {{- if eq .Values.azure.authMethod "secret" }}
+            # Azure DCR bearer token from Kubernetes secret
             - name: AZURE_DCR_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.azure.tokenSecretName }}
                   key: {{ .Values.azure.tokenSecretKey }}
+            {{- end }}
           ports:
             - name: syslog-tls
               containerPort: 6514
@@ -71,6 +119,47 @@ spec:
               readOnly: true
             - name: data
               mountPath: /var/lib/vector
+            {{- if eq .Values.azure.authMethod "workloadIdentity" }}
+            - name: azure-token
+              mountPath: /var/run/azure-token
+              readOnly: true
+            {{- end }}
+        {{- if eq .Values.azure.authMethod "workloadIdentity" }}
+        # Sidecar to refresh Azure token before expiry
+        - name: token-refresh
+          image: "{{ .Values.tokenRefresh.image.repository }}:{{ .Values.tokenRefresh.image.tag }}"
+          imagePullPolicy: {{ .Values.tokenRefresh.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting token refresh loop (every {{ .Values.azure.tokenRefreshSeconds }}s)..."
+              while true; do
+                sleep {{ .Values.azure.tokenRefreshSeconds }}
+                echo "$(date): Refreshing Azure token..."
+                TOKEN=$(az account get-access-token --resource https://monitor.azure.com --query accessToken -o tsv)
+                if [ -n "$TOKEN" ]; then
+                  echo "$TOKEN" > /var/run/azure-token/token.new
+                  mv /var/run/azure-token/token.new /var/run/azure-token/token
+                  echo "$(date): Token refreshed successfully"
+                else
+                  echo "$(date): WARNING - Failed to refresh token, keeping existing"
+                fi
+              done
+          volumeMounts:
+            - name: azure-token
+              mountPath: /var/run/azure-token
+          resources:
+            {{- toYaml .Values.tokenRefresh.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+        {{- end }}
       terminationGracePeriodSeconds: 60
       volumes:
         - name: config
@@ -91,6 +180,12 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if eq .Values.azure.authMethod "workloadIdentity" }}
+        - name: azure-token
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Ki
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -9,7 +9,7 @@ replicaCount: 1
 
 image:
   repository: timberio/vector
-  tag: "0.35.0"
+  tag: "0.52.0-alpine"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -27,13 +27,38 @@ tls:
 
 # Azure Log Analytics configuration
 azure:
-  # Name of existing Kubernetes secret containing the DCR token
+  # Authentication method: "workloadIdentity" (recommended) or "secret"
+  # - workloadIdentity: Uses Azure Workload Identity with token refresh sidecar
+  # - secret: Uses pre-existing Kubernetes secret with bearer token
+  authMethod: "workloadIdentity"
+  
+  # For workloadIdentity auth:
+  # The service account must be annotated for Azure Workload Identity
+  # Token refresh sidecar will automatically fetch and refresh tokens
+  tokenRefreshSeconds: 1800  # Refresh every 30 minutes (tokens expire in 1 hour)
+  
+  # For secret auth (legacy):
+  # Name of existing Kubernetes secret containing the bearer token
   tokenSecretName: "azure-log-analytics"
-  # Key in the secret containing the bearer token
   tokenSecretKey: "token"
+  
   # Data Collection Rule endpoint URI
-  # Format: https://<DCE>.ingest.monitor.azure.com/dataCollectionRules/<DCR-ID>/streams/<Stream>?api-version=2023-01-01
+  # Format: https://<DCR-endpoint>/dataCollectionRules/<DCR-ID>/streams/<Stream>?api-version=2023-01-01
   dcrUri: "https://example-dce.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-xxxxxxxx/streams/Custom-MyLogs_CL?api-version=2023-01-01"
+
+# Token refresh sidecar (for workloadIdentity auth)
+tokenRefresh:
+  image:
+    repository: mcr.microsoft.com/azure-cli
+    tag: "2.67.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
 # HTTP sink configuration
 http:

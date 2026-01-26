@@ -1,0 +1,89 @@
+# External Secrets Operator Helm Values for CZ Cluster
+# Chart: https://charts.external-secrets.io
+# Version: Pin in ArgoCD Application
+
+# Install CRDs
+installCRDs: true
+
+# Replicas for HA
+replicaCount: 2
+
+# Azure Workload Identity labels
+podLabels:
+  azure.workload.identity/use: "true"
+
+# Prometheus scraping annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# Service account with Workload Identity
+serviceAccount:
+  create: true
+  name: external-secrets
+  annotations:
+    # TODO: Update with CZ cluster's ESO managed identity client ID
+    azure.workload.identity/client-id: "<CZ_ESO_MANAGED_IDENTITY_CLIENT_ID>"
+    azure.workload.identity/tenant-id: "14021cba-cdc0-4c87-a145-b66f94b7017f"
+  labels:
+    azure.workload.identity/use: "true"
+
+# Resource limits
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Enable metrics
+metrics:
+  enabled: true
+
+# Webhook configuration
+webhook:
+  port: 10250
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+# Cert controller configuration
+certController:
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+# Tolerations for critical workloads
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Equal
+    value: "true"
+    effect: NoSchedule

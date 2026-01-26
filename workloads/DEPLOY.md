@@ -618,70 +618,203 @@ helm uninstall $HELM_RELEASE -n $VECTOR_NAMESPACE
 
 ## ArgoCD Best Practices & Drift Prevention
 
-**Follow these rules to ensure your cluster stays in sync with Git and avoid configuration drift:**
+> **📖 Full Reference:** See [AGENTS.md](../AGENTS.md) for the complete GitOps operating manual and critical rules.
 
-### 1. Git is the Source of Truth
-- **Never** apply resources directly with `kubectl apply`, `kubectl edit`, or `helm install/upgrade`.
-- All changes must go through Git and be reconciled by ArgoCD.
+This section summarizes essential ArgoCD and GitOps rules for safe, reliable, and drift-free Kubernetes deployments.
 
-### 2. Automated Sync, Prune, and Self-Heal
-- Use `syncPolicy.automated.prune: true` and `selfHeal: true` in all ArgoCD Application specs:
+---
+
+### Core Principles (Non-Negotiables)
+
+| Rule | Description |
+|------|-------------|
+| **Git is the source of truth** | All changes must go through Git. Never apply resources directly to the cluster. |
+| **No manual `kubectl`/`helm`** | Do NOT run `kubectl apply`, `kubectl edit`, `helm install`, or `helm upgrade` directly. |
+| **All config in `values.yaml`** | Helm chart configuration and overrides must be in version-controlled `values.yaml` files. |
+| **No secrets in Git** | Use External Secrets Operator and Azure Key Vault references only. |
+| **Pin versions** | Always pin Helm chart and container image versions. |
+
+---
+
+### Automated Sync, Prune, and Self-Heal
+
+Configure all ArgoCD Applications with automated sync policies:
 
 ```yaml
 syncPolicy:
   automated:
-    prune: true        # Delete resources not in Git
+    prune: true        # Delete resources removed from Git
     selfHeal: true     # Revert manual changes in cluster
   syncOptions:
     - CreateNamespace=true
     - ServerSideApply=true
 ```
 
-- This ensures ArgoCD will:
-  - Automatically sync changes from Git
-  - Delete orphaned resources
-  - Overwrite any manual changes in the cluster
+**What this ensures:**
+- ✅ Automatically sync changes from Git to cluster
+- ✅ Delete orphaned resources no longer defined in Git
+- ✅ Overwrite any manual/drift changes in the cluster
+- ✅ Create namespaces if they don't exist
 
-### 3. Detecting and Resolving Drift
-- Use `argocd app diff <app>` to see differences between Git and cluster
-- Use `argocd app sync <app> --force` to force reconciliation
-- Use `argocd app history <app>` and `argocd app rollback <app> <revision>` to revert to a previous state
-- If you must make a manual change (emergency only), document it and immediately restore desired state in Git
+---
 
-### 4. Sync Waves and Dependency Ordering
-- Use `argocd.argoproj.io/sync-wave` annotations to control resource apply order (e.g., namespaces before apps)
-- Example:
+### Detecting and Resolving Drift
+
+**Quick Triage Commands:**
+
+```bash
+# Check sync status and health
+argocd app get $VECTOR_APP_NAME
+
+# View diff between Git and cluster state
+argocd app diff $VECTOR_APP_NAME
+
+# Force sync to reconcile drift
+argocd app sync $VECTOR_APP_NAME --force
+
+# Hard refresh (re-read from Git)
+argocd app get $VECTOR_APP_NAME --hard-refresh
+
+# View sync history
+argocd app history $VECTOR_APP_NAME
+
+# Rollback to previous revision
+argocd app rollback $VECTOR_APP_NAME <revision>
+```
+
+**If drift is detected:**
+1. **Never fix by hand** — Always update Git and let ArgoCD reconcile
+2. Use `argocd app diff` to understand what changed
+3. Either revert the manual change OR commit it to Git
+4. Force sync if needed: `argocd app sync <app> --force`
+
+---
+
+### Sync Waves and Dependency Ordering
+
+Use `sync-wave` annotations to control resource apply order:
+
 ```yaml
 metadata:
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "-1"  # Applied before wave 0
 ```
 
-### 5. Ignore Differences for Volatile Fields
-- Use `ignoreDifferences` in Application spec to avoid false drift on fields like webhook caBundle, status, etc.
-- Example:
+**Recommended wave ordering:**
+| Wave | Resources |
+|------|-----------|
+| -1 | Namespaces, CRDs |
+| 0 | Shared resources, ConfigMaps |
+| 1 | Core controllers (cert-manager, external-secrets) |
+| 2 | Infrastructure (Traefik, monitoring) |
+| 3+ | Application workloads |
+
+---
+
+### Ignore Differences for Volatile Fields
+
+Prevent false drift on fields managed by controllers:
+
 ```yaml
-ignoreDifferences:
-  - group: admissionregistration.k8s.io
-    kind: ValidatingWebhookConfiguration
-    jsonPointers:
-      - /webhooks/0/clientConfig/caBundle
+spec:
+  ignoreDifferences:
+    # Webhook CA bundles (injected by cert-manager)
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    # Status fields
+    - group: "*"
+      kind: "*"
+      jsonPointers:
+        - /status
+    # Annotations managed by controllers
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /metadata/annotations/service.beta.kubernetes.io~1azure-load-balancer-resource-group
 ```
 
-### 6. Health Checks and Monitoring
-- Use ArgoCD's health status and `argocd app get <app>` to monitor sync and health
-- Integrate with Prometheus/Grafana for alerting on OutOfSync or Degraded status
+---
 
-### 7. Policy Reminders
-- All configuration must be in `values.yaml` or manifests in Git
-- No secrets in Git: use External Secrets Operator and Azure Key Vault
-- Pin all chart and image versions
-- Document all manual interventions in `logs/commands/` and `logs/problems/`
+### Health Checks and Monitoring
 
-### 8. Recovery and Rollback
-- Use `git revert` and ArgoCD sync to roll back changes
-- If ArgoCD is blocked, document the incident and restore desired state via PR
+**ArgoCD Status Commands:**
+```bash
+# List all apps with status
+argocd app list
 
-**Reference:** See AGENTS.md in the repo for the full GitOps operating manual and critical rules.
+# Detailed app status
+argocd app get <app-name>
+
+# Watch for changes
+argocd app get <app-name> --watch
+```
+
+**Custom Health Checks:** Define resource health for CRDs (HTTPRoute, Certificate, ExternalSecret) in ArgoCD ConfigMap to improve status accuracy.
+
+**Alerting:** Integrate with Prometheus/Grafana for alerts on:
+- `OutOfSync` status
+- `Degraded` or `Unknown` health
+- Sync failures
+
+---
+
+### Policy Reminders
+
+| ❌ NEVER DO | ✅ DO THIS INSTEAD |
+|-------------|-------------------|
+| `kubectl apply -f <file>` | Commit to Git → ArgoCD syncs |
+| `kubectl edit <resource>` | Edit `values.yaml` → Commit → Sync |
+| `kubectl create <resource>` | Add manifest to Git → Commit → Sync |
+| `helm install <chart>` | Create ArgoCD Application in Git |
+| `helm upgrade <release>` | Update `values.yaml` → Commit → Sync |
+| Manual cluster changes | Git is the source of truth |
+
+**Break-Glass Exceptions (emergencies only):**
+1. Document the change in `logs/problems/PROB-YYYYMMDD-###.md`
+2. Immediately create a PR to sync Git with the change
+3. Apply the PR so ArgoCD owns the resource going forward
+
+---
+
+### Troubleshooting & Recovery Commands
+
+**ArgoCD Triage:**
+```bash
+argocd app list                          # List all apps
+argocd app get <app>                     # Detailed status
+argocd app diff <app>                    # Show drift
+argocd app sync <app>                    # Sync app
+argocd app sync <app> --force            # Force sync
+argocd app history <app>                 # View history
+argocd app rollback <app> <revision>     # Rollback
+```
+
+**Kubernetes Triage:**
+```bash
+kubectl get pods -A                                           # All pods
+kubectl get events -A --sort-by=.metadata.creationTimestamp   # Recent events
+kubectl describe <resource> <name> -n <ns>                    # Resource details
+kubectl logs <pod> -n <ns> --tail=200                         # Pod logs
+```
+
+**Rollback Workflow:**
+```bash
+# 1. Revert the commit in Git
+git revert <sha>
+git push
+
+# 2. ArgoCD auto-syncs the rollback (or manually trigger)
+argocd app sync <app>
+
+# 3. Verify
+argocd app get <app>
+```
+
+See also:
+- [Troubleshooting](#troubleshooting) section above for Vector-specific issues
+- [ArgoCD Sync Issues](#argocd-sync-issues) for common sync problems
+- [AGENTS.md](../AGENTS.md) for the full GitOps operating manual
 
 ---

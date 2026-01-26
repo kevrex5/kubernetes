@@ -16,3 +16,9 @@
 .idea/
 *.tmproj
 .vscode/
+# Test directory
+test/
+# Terraform files
+*.terraform*
+terraform-provider-*
+.terraform.lock.hcl

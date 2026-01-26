@@ -1,0 +1,95 @@
+# Vector Local Test Configuration
+# ================================
+# Simplified config for local testing without TLS or Azure credentials
+# - Uses stdin for input (paste messages to test)
+# - Uses console sink (outputs to terminal instead of Azure)
+# - No secrets required
+
+data_dir: /tmp/vector-data
+
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
+  playground: true  # Enable GraphQL playground for debugging
+
+# =============================================================================
+# SOURCES
+# =============================================================================
+sources:
+  # For interactive testing: paste syslog lines
+  stdin:
+    type: stdin
+    decoding:
+      codec: bytes
+
+  # Alternative: use demo_logs to auto-generate test data
+  # Uncomment to test without manual input
+  # demo:
+  #   type: demo_logs
+  #   format: syslog
+  #   interval: 2
+
+# =============================================================================
+# TRANSFORMS (same logic as production)
+# =============================================================================
+transforms:
+  # Parse syslog messages
+  parse_syslog:
+    type: remap
+    inputs:
+      - stdin
+    source: |
+      # Try to parse syslog format
+      parsed, err = parse_syslog(.message)
+      if err != null {
+        # Keep original if parsing fails
+        .parse_error = err
+        .raw_message = .message
+      } else {
+        . = merge(., parsed)
+      }
+
+      # Add ingestion metadata
+      .meta.port_received = 6514
+      .meta.received_at = now()
+      .meta.vector_instance = get_hostname() ?? "unknown"
+
+  # Enrich events with additional context
+  enrich:
+    type: remap
+    inputs:
+      - parse_syslog
+    source: |
+      # Extract severity level for Azure
+      severity = to_int(.severity) ?? 6
+      .severity_label = if severity <= 2 {
+        "Critical"
+      } else if severity <= 4 {
+        "Error"
+      } else if severity == 5 {
+        "Warning"
+      } else {
+        "Information"
+      }
+
+      # Ensure timestamp exists
+      if !exists(.timestamp) {
+        .timestamp = now()
+      }
+
+      # Create TimeGenerated for Azure (required field)
+      .TimeGenerated = format_timestamp!(.timestamp, "%Y-%m-%dT%H:%M:%S%.fZ")
+
+# =============================================================================
+# SINKS - Console output for testing
+# =============================================================================
+sinks:
+  # Output to console (instead of Azure)
+  console:
+    type: console
+    inputs:
+      - enrich
+    encoding:
+      codec: json
+    # Pretty print for readability
+    target: stdout

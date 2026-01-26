@@ -1,0 +1,212 @@
+---
+# CZ Platform Applications
+# Manages all platform infrastructure components for the CZ cluster
+# Uses sync waves to ensure dependency ordering
+
+# ============================================================================
+# Namespaces (sync wave -1 - created before all other resources)
+# ============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cz-platform-namespaces
+  namespace: rex5-cc-mz-k8s-argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-cz
+  source:
+    repoURL: git@github.com:kevrex5/kubernetes.git
+    targetRevision: HEAD
+    path: platform-cz/canadacentral/namespaces
+  destination:
+    # TODO: Update with CZ cluster server URL after running:
+    # argocd cluster add <CZ_CONTEXT> --name cz-cluster
+    server: '<CZ_CLUSTER_SERVER>'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# ============================================================================
+# cert-manager (sync wave 1 - needed for certificates)
+# ============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cz-platform-cert-manager
+  namespace: rex5-cc-mz-k8s-argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-cz
+  sources:
+    # Helm chart
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.17.1  # Pinned version
+      helm:
+        valueFiles:
+          - $values/platform-cz/canadacentral/cert-manager/values.yaml
+    # Values from Git
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      ref: values
+    # ClusterIssuers and other resources
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      path: platform-cz/canadacentral/cert-manager
+      directory:
+        exclude: '{values.yaml,kustomization.yaml}'
+  destination:
+    # TODO: Update with CZ cluster server URL
+    server: '<CZ_CLUSTER_SERVER>'
+    namespace: rex5-cc-cz-k8s-cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+
+---
+# ============================================================================
+# external-secrets (sync wave 2 - needed for secrets)
+# ============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cz-platform-external-secrets
+  namespace: rex5-cc-mz-k8s-argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-cz
+  sources:
+    # Helm chart
+    - repoURL: https://charts.external-secrets.io
+      chart: external-secrets
+      targetRevision: 0.17.0  # Supports v1 API
+      helm:
+        valueFiles:
+          - $values/platform-cz/canadacentral/external-secrets/values.yaml
+    # Values from Git
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      ref: values
+    # ClusterSecretStores
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      path: platform-cz/canadacentral/external-secrets
+      directory:
+        exclude: '{values.yaml,kustomization.yaml}'
+  destination:
+    # TODO: Update with CZ cluster server URL
+    server: '<CZ_CLUSTER_SERVER>'
+    namespace: rex5-cc-cz-k8s-external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+
+---
+# ============================================================================
+# Traefik (sync wave 3 - ingress controller)
+# ============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cz-platform-traefik
+  namespace: rex5-cc-mz-k8s-argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-cz
+  sources:
+    # Helm chart
+    - repoURL: https://traefik.github.io/charts
+      chart: traefik
+      targetRevision: 38.0.2  # Pinned version
+      helm:
+        valueFiles:
+          - $values/platform-cz/canadacentral/traefik/values.yaml
+    # Values from Git
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      ref: values
+    # ExternalSecret, wildcard certificate
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      path: platform-cz/canadacentral/traefik
+      directory:
+        exclude: '{values.yaml,kustomization.yaml}'
+  destination:
+    # TODO: Update with CZ cluster server URL
+    server: '<CZ_CLUSTER_SERVER>'
+    namespace: rex5-cc-cz-k8s-traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

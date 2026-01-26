@@ -3,7 +3,7 @@ name: vector-azure-simple
 description: Vector deployment with syslog TLS ingestion and single Azure Log Analytics destination
 type: application
 version: 1.0.0
-appVersion: "0.35.0"
+appVersion: "0.52.0"
 keywords:
   - vector
   - syslog

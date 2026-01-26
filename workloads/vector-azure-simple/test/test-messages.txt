@@ -1,0 +1,27 @@
+# Test Messages for Vector Syslog Parsing
+# =========================================
+# Copy/paste these into Vector stdin or use: cat test-messages.txt | ...
+
+# 1. Standard syslog - informational (priority 14 = facility 1, severity 6)
+<14>1 2024-01-15T10:30:00Z webserver01 nginx 1234 - - 192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET /api/health HTTP/1.1" 200 15
+
+# 2. Critical syslog (priority 2 = facility 0, severity 2)
+<2>1 2024-01-15T10:31:00Z firewall01 kernel - - - Kernel panic - not syncing: Fatal exception
+
+# 3. Error syslog (priority 11 = facility 1, severity 3)
+<11>1 2024-01-15T10:32:00Z dbserver mysql 5678 - - ERROR 1045: Access denied for user 'admin'@'10.0.0.5'
+
+# 4. Warning syslog (priority 12 = facility 1, severity 4)  
+<12>1 2024-01-15T10:33:00Z appserver java 9999 - - WARN: Connection pool nearly exhausted (95% used)
+
+# 5. Notice syslog (priority 13 = facility 1, severity 5)
+<13>1 2024-01-15T10:34:00Z authserver sshd 2222 - - Accepted publickey for admin from 10.0.0.50 port 54321
+
+# 6. RFC3164 format (older syslog)
+<14>Jan 15 10:35:00 router01 interface: Link up on eth0
+
+# 7. Malformed message (should still be processed with parse_error)
+This is not a valid syslog message
+
+# 8. Network device syslog
+<14>1 2024-01-15T10:36:00Z switch01 - - - - %LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to up

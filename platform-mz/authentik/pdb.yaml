@@ -1,0 +1,75 @@
+# Authentik PodDisruptionBudgets
+# ==============================
+# Ensures high availability during node maintenance, upgrades, and scaling
+#
+# With replicas=2 for server/worker, minAvailable=1 ensures:
+# - At least one pod always running during voluntary disruptions
+# - Rolling updates proceed safely
+# - Node drains don't cause service outage
+
+---
+# Server PDB - Ensures web UI/API availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authentik-server
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/component: server
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/component: server
+
+---
+# Worker PDB - Ensures background task processing continues
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authentik-worker
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/component: worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/component: worker
+
+---
+# PostgreSQL PDB - Database must remain available
+# Note: With single replica, this prevents accidental deletion but allows planned maintenance
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authentik-postgresql
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    app.kubernetes.io/name: postgresql
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/instance: platform-authentik
+
+---
+# Redis PDB - Cache/session store must remain available
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authentik-redis
+  namespace: rex5-cc-mz-k8s-authentik
+  labels:
+    app.kubernetes.io/name: redis
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: platform-authentik

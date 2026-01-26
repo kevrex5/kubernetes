@@ -1,0 +1,53 @@
+---
+# ClusterIssuer - Let's Encrypt Staging (for testing)
+# Use this first to avoid rate limits
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@rex5.ca
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+      - dns01:
+          azureDNS:
+            # TODO: Update subscription ID if CZ uses different subscription
+            subscriptionID: "<CZ_SUBSCRIPTION_ID>"
+            # TODO: Update with CZ DNS zone resource group
+            resourceGroupName: "<CZ_DNS_ZONE_RESOURCE_GROUP>"
+            # DNS zone for CZ cluster
+            hostedZoneName: cz.cc.rex5.ca
+            environment: AzurePublicCloud
+            managedIdentity:
+              # TODO: Update with CZ cert-manager managed identity client ID
+              clientID: "<CZ_CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>"
+
+---
+# ClusterIssuer - Let's Encrypt Production
+# Use after verifying staging works
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@rex5.ca
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - dns01:
+          azureDNS:
+            # TODO: Update subscription ID if CZ uses different subscription
+            subscriptionID: "<CZ_SUBSCRIPTION_ID>"
+            # TODO: Update with CZ DNS zone resource group
+            resourceGroupName: "<CZ_DNS_ZONE_RESOURCE_GROUP>"
+            # DNS zone for CZ cluster
+            hostedZoneName: cz.cc.rex5.ca
+            environment: AzurePublicCloud
+            managedIdentity:
+              # TODO: Update with CZ cert-manager managed identity client ID
+              clientID: "<CZ_CERT_MANAGER_MANAGED_IDENTITY_CLIENT_ID>"

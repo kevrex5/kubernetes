@@ -1,0 +1,91 @@
+# Vector Local Test Configuration - Azure LAW Integration
+# ========================================================
+# Test Vector posting directly to Azure Log Analytics via DCR
+# Run with: ./test-azure.sh
+
+data_dir: /tmp/vector-data
+
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
+  playground: false
+
+# =============================================================================
+# SOURCES
+# =============================================================================
+sources:
+  # Generate demo logs for testing
+  demo_logs:
+    type: demo_logs
+    format: syslog
+    interval: 5  # Generate a log every 5 seconds
+
+# =============================================================================
+# TRANSFORMS
+# =============================================================================
+transforms:
+  # Enrich for Azure Log Analytics
+  enrich:
+    type: remap
+    inputs:
+      - demo_logs
+    source: |
+      # Create TimeGenerated (required field for Azure)
+      .TimeGenerated = format_timestamp!(now(), "%Y-%m-%dT%H:%M:%S%.fZ")
+      
+      # Map to CEF-like fields
+      .DeviceVendor = "VectorTest"
+      .DeviceProduct = "DemoLogs"
+      .DeviceVersion = "1.0"
+      .DeviceEventClassID = "demo"
+      .Activity = "Test Log Generation"
+      .LogSeverity = "6"
+      .Message = .message
+      .SourceIP = "127.0.0.1"
+      .Computer = get_hostname() ?? "vector-test"
+      
+      # Remove fields Azure doesn't need
+      del(.source_type)
+      del(.message)
+      del(.timestamp)
+
+# =============================================================================
+# SINKS
+# =============================================================================
+sinks:
+  # Console output for debugging
+  console:
+    type: console
+    inputs:
+      - enrich
+    encoding:
+      codec: json
+
+  # Azure Log Analytics via Data Collection Rule
+  azure_logs:
+    type: http
+    inputs:
+      - enrich
+    uri: "https://dcr-vector-cef-test-rybg-canadacentral.logs.z1.ingest.monitor.azure.com/dataCollectionRules/dcr-05643141f9d04202b890e4d027c9b29c/streams/Custom-VectorCEF?api-version=2023-01-01"
+    method: post
+    encoding:
+      codec: json
+    # Bearer token authentication (token provided via environment variable)
+    auth:
+      strategy: bearer
+      token: "${AZURE_BEARER_TOKEN}"
+    headers:
+      Content-Type: "application/json"
+    compression: gzip
+    batch:
+      max_bytes: 900000
+      timeout_secs: 5
+    request:
+      concurrency: 4
+      timeout_secs: 30
+      retry_attempts: 3
+    buffer:
+      type: memory
+      max_events: 500
+    healthcheck:
+      enabled: false

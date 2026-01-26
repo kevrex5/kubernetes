@@ -1,0 +1,25 @@
+# Example Terraform Variables
+# ============================
+# Copy this file to terraform.tfvars and fill in your values
+
+# Required - Your existing Azure resources
+resource_group_name          = "rg-logging-test"
+log_analytics_workspace_name = "law-logging-test"
+
+# Optional - Customize these as needed
+dcr_name   = "dcr-vector-cef-test"
+table_name = "VectorCEF"
+
+# Table configuration
+table_plan              = "Analytics"  # or "Basic" for lower cost
+retention_in_days       = 30
+total_retention_in_days = 30
+
+# Optional KQL transformation (default passes through unchanged)
+# transform_kql = "source | extend Environment = 'Test'"
+
+tags = {
+  Purpose     = "Vector Testing"
+  Environment = "Test"
+  ManagedBy   = "Terraform"
+}

@@ -1,0 +1,15 @@
+---
+# cert-manager Namespace - CZ Cluster
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rex5-cc-cz-k8s-cert-manager
+  labels:
+    # Pod Security Admission - baseline for platform components
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+    # App labels
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: certificates
+    app.kubernetes.io/part-of: platform-cz

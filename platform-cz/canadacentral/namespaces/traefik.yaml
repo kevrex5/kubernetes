@@ -1,0 +1,15 @@
+---
+# Traefik Namespace - CZ Cluster
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rex5-cc-cz-k8s-traefik
+  labels:
+    # Pod Security Admission - baseline for platform components
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+    # App labels
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: platform-cz
