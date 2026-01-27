@@ -2,6 +2,9 @@
 # CZ Platform Applications
 # Manages all platform infrastructure components for the CZ cluster
 # Uses sync waves to ensure dependency ordering
+#
+# NOTE: This cluster uses Azure CNI Powered by Cilium. Cilium is managed by Azure.
+# Hubble (observability) is deployed separately via Helm.
 
 # ============================================================================
 # Namespaces (sync wave -1 - created before all other resources)
@@ -22,10 +25,62 @@ spec:
     targetRevision: HEAD
     path: platform-cz/canadacentral/namespaces
   destination:
-    # TODO: Update with CZ cluster server URL after running:
-    # argocd cluster add <CZ_CONTEXT> --name cz-cluster
-    server: '<CZ_CLUSTER_SERVER>'
+    server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# ============================================================================
+# Hubble Observability (sync wave 0 - alongside Azure-managed Cilium)
+# ============================================================================
+# NOTE: This does NOT install Cilium - Azure manages that.
+# This only deploys Hubble Relay + UI for network flow visibility.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cz-platform-hubble
+  namespace: rex5-cc-mz-k8s-argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-cz
+  sources:
+    # Helm chart (Cilium chart with only Hubble enabled)
+    # NOTE: Match version to Azure-managed Cilium (see: az aks show --query currentKubernetesVersion)
+    # AKS 1.31 = Cilium 1.16.x, AKS 1.32+ = Cilium 1.17.x
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.17.12
+      helm:
+        valueFiles:
+          - $values/platform-cz/canadacentral/hubble/values.yaml
+    # Values from Git
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      ref: values
+    # NetworkPolicies
+    - repoURL: git@github.com:kevrex5/kubernetes.git
+      targetRevision: HEAD
+      path: platform-cz/canadacentral/hubble
+      directory:
+        exclude: '{values.yaml,kustomization.yaml,README.md}'
+  destination:
+    server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
+    namespace: kube-system  # Hubble runs alongside Cilium in kube-system
   syncPolicy:
     automated:
       prune: true
@@ -74,8 +129,7 @@ spec:
       directory:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
-    # TODO: Update with CZ cluster server URL
-    server: '<CZ_CLUSTER_SERVER>'
+    server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     namespace: rex5-cc-cz-k8s-cert-manager
   syncPolicy:
     automated:
@@ -134,8 +188,7 @@ spec:
       directory:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
-    # TODO: Update with CZ cluster server URL
-    server: '<CZ_CLUSTER_SERVER>'
+    server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     namespace: rex5-cc-cz-k8s-external-secrets
   syncPolicy:
     automated:
@@ -194,8 +247,7 @@ spec:
       directory:
         exclude: '{values.yaml,kustomization.yaml}'
   destination:
-    # TODO: Update with CZ cluster server URL
-    server: '<CZ_CLUSTER_SERVER>'
+    server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     namespace: rex5-cc-cz-k8s-traefik
   syncPolicy:
     automated:

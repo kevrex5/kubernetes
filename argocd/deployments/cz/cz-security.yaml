@@ -20,20 +20,21 @@ spec:
     - 'https://traefik.github.io/charts'      # traefik
 
   # Destination clusters and namespaces
-  # TODO: Update <CZ_CLUSTER_SERVER> with actual CZ cluster API server URL
-  # After running: argocd cluster add <CZ_CONTEXT> --name cz-cluster
-  # Get the server URL with: argocd cluster list
+  # CZ cluster registered via cz-cluster-secret.yaml using Workload Identity
   destinations:
     # Default namespace (needed for namespace creation)
     - namespace: default
-      server: '<CZ_CLUSTER_SERVER>'
+      server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
+    # kube-system (needed for Hubble deployment)
+    - namespace: kube-system
+      server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     # Platform namespaces in CZ cluster
     - namespace: rex5-cc-cz-k8s-traefik
-      server: '<CZ_CLUSTER_SERVER>'
+      server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     - namespace: rex5-cc-cz-k8s-cert-manager
-      server: '<CZ_CLUSTER_SERVER>'
+      server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
     - namespace: rex5-cc-cz-k8s-external-secrets
-      server: '<CZ_CLUSTER_SERVER>'
+      server: 'https://rex5-cc-cz-prod.rex5-cc-cz-prod-aks.privatelink.canadacentral.azmk8s.io:443'
 
   # Cluster-scoped resources platform apps can manage
   clusterResourceWhitelist:
