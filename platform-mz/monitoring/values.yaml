@@ -22,11 +22,11 @@ prometheus:
     
     resources:
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 200m
+        memory: 1Gi
       limits:
-        cpu: 500m
-        memory: 384Mi
+        cpu: "1"
+        memory: 2Gi
     
     tolerations:
       - key: kubernetes.azure.com/scalesetpriority
