@@ -1,0 +1,150 @@
+---
+# NetworkPolicies for Hubble components in kube-system namespace
+# Note: Hubble runs in kube-system alongside Azure-managed Cilium
+
+# Allow Hubble Relay to receive flows from Cilium agents
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hubble-relay-ingress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hubble-relay
+  policyTypes:
+    - Ingress
+  ingress:
+    # From Cilium agents (flow data)
+    - from:
+        - podSelector:
+            matchLabels:
+              k8s-app: cilium
+      ports:
+        - protocol: TCP
+          port: 4245
+    # From Hubble UI
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hubble-ui
+      ports:
+        - protocol: TCP
+          port: 4245
+
+---
+# Allow Hubble UI ingress from Traefik
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hubble-ui-ingress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hubble-ui
+  policyTypes:
+    - Ingress
+  ingress:
+    # From Traefik namespace for external access
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rex5-cc-cz-k8s-traefik
+      ports:
+        - protocol: TCP
+          port: 8081
+
+---
+# Allow Hubble components DNS egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hubble-dns-egress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - hubble-relay
+          - hubble-ui
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Allow Hubble UI to reach Hubble Relay
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hubble-ui-egress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hubble-ui
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hubble-relay
+      ports:
+        - protocol: TCP
+          port: 4245
+
+---
+# Allow Hubble Relay to reach Cilium agents on all nodes
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hubble-relay-egress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hubble-relay
+  policyTypes:
+    - Egress
+  egress:
+    # Reach Cilium agents
+    - to:
+        - podSelector:
+            matchLabels:
+              k8s-app: cilium
+      ports:
+        - protocol: TCP
+          port: 4244  # Hubble peer port on agents
+
+---
+# Allow Prometheus to scrape Hubble metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hubble-prometheus-scrape
+  namespace: kube-system
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - hubble-relay
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rex5-cc-cz-k8s-monitoring
+      ports:
+        - protocol: TCP
+          port: 9965  # Hubble metrics port

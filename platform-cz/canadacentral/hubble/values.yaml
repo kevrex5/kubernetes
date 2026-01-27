@@ -1,0 +1,101 @@
+# Hubble Observability for Azure CNI Powered by Cilium
+# 
+# IMPORTANT: This does NOT install Cilium itself - Azure manages that.
+# This only deploys Hubble Relay and UI for network flow visibility.
+#
+# Chart: https://helm.cilium.io/
+# 
+# The trick is to disable all Cilium components and only enable Hubble.
+
+# ============================================================================
+# Disable Cilium Agent/Operator (Azure manages these)
+# ============================================================================
+# Do NOT deploy the agent or operator - Azure handles this
+agent: false
+operator:
+  enabled: false
+
+# Disable all other Cilium features
+cni:
+  install: false
+ipam:
+  mode: "disabled"
+
+# ============================================================================
+# Hubble - Network Observability (what we actually want)
+# ============================================================================
+hubble:
+  enabled: true
+  
+  # Hubble metrics for Prometheus
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - http
+    serviceMonitor:
+      enabled: false  # Enable if using Prometheus Operator
+      # namespace: rex5-cc-cz-k8s-monitoring
+  
+  # Peer service (connects to Cilium agents for flow data)
+  peerService:
+    clusterDomain: cluster.local
+  
+  # Hubble Relay - aggregates flow data from all nodes
+  relay:
+    enabled: true
+    replicas: 1
+    image:
+      repository: quay.io/cilium/hubble-relay
+      tag: v1.17.12  # Match Azure-managed Cilium version
+      useDigest: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    tolerations:
+      - operator: Exists
+  
+  # Hubble UI - web interface for flow visibility
+  ui:
+    enabled: true
+    replicas: 1
+    frontend:
+      image:
+        repository: quay.io/cilium/hubble-ui
+        tag: v0.13.1  # UI version is independent of Cilium version
+        useDigest: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+    backend:
+      image:
+        repository: quay.io/cilium/hubble-ui-backend
+        tag: v0.13.1
+        useDigest: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+    # We'll use HTTPRoute via Traefik instead
+    ingress:
+      enabled: false
+
+# ============================================================================
+# TLS (optional - for secure gRPC between Hubble components)
+# ============================================================================
+tls:
+  enabled: false  # Disable for simpler setup, enable for production
