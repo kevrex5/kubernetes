@@ -18,6 +18,7 @@ spec:
     - 'https://charts.jetstack.io'            # cert-manager
     - 'https://charts.external-secrets.io'    # external-secrets
     - 'https://traefik.github.io/charts'      # traefik
+    - 'https://helm.cilium.io'                # cilium/hubble
 
   # Destination clusters and namespaces
   # CZ cluster registered via cz-cluster-secret.yaml using Workload Identity
