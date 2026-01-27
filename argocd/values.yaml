@@ -52,6 +52,34 @@ repoServer:
     limits:
       cpu: 500m
       memory: 512Mi
+  
+  # Workload Identity for CZ cluster access
+  serviceAccount:
+    annotations:
+      azure.workload.identity/client-id: "63de6227-6397-4376-bb12-741e739440f0"
+      azure.workload.identity/tenant-id: "14021cba-cdc0-4c87-a145-b66f94b7017f"
+    labels:
+      azure.workload.identity/use: "true"
+  
+  # Add kubelogin for Azure AD Workload Identity authentication
+  volumes:
+    - name: kubelogin
+      emptyDir: {}
+  volumeMounts:
+    - name: kubelogin
+      mountPath: /usr/local/bin/kubelogin
+      subPath: kubelogin
+  initContainers:
+    - name: download-kubelogin
+      image: mcr.microsoft.com/azure-cli:latest
+      command:
+        - sh
+        - -c
+        - |
+          az aks install-cli --only-show-errors --kubelogin-install-location /kubelogin/kubelogin
+      volumeMounts:
+        - name: kubelogin
+          mountPath: /kubelogin
 
 # Application controller
 controller:
@@ -63,6 +91,44 @@ controller:
     limits:
       cpu: 1000m
       memory: 1Gi
+  
+  # -------------------------------------------------------------------------
+  # Workload Identity for CZ Cluster Management
+  # -------------------------------------------------------------------------
+  # This annotation enables the MZ ArgoCD controller to authenticate to the
+  # CZ cluster using Azure AD Workload Identity.
+  #
+  # The federated credential on rex5-cc-cz-prod-argocd-identity trusts:
+  #   Subject: system:serviceaccount:rex5-cc-mz-k8s-argocd:argocd-application-controller
+  #
+  # See: argocd/deployments/cz/cz-cluster-secret.yaml for cluster registration
+  # -------------------------------------------------------------------------
+  serviceAccount:
+    annotations:
+      azure.workload.identity/client-id: "63de6227-6397-4376-bb12-741e739440f0"
+      azure.workload.identity/tenant-id: "14021cba-cdc0-4c87-a145-b66f94b7017f"
+    labels:
+      azure.workload.identity/use: "true"
+  
+  # Add kubelogin for Azure AD Workload Identity authentication
+  volumes:
+    - name: kubelogin
+      emptyDir: {}
+  volumeMounts:
+    - name: kubelogin
+      mountPath: /usr/local/bin/kubelogin
+      subPath: kubelogin
+  initContainers:
+    - name: download-kubelogin
+      image: mcr.microsoft.com/azure-cli:latest
+      command:
+        - sh
+        - -c
+        - |
+          az aks install-cli --only-show-errors --kubelogin-install-location /kubelogin/kubelogin
+      volumeMounts:
+        - name: kubelogin
+          mountPath: /kubelogin
 
 # Redis
 redis:
