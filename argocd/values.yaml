@@ -45,6 +45,11 @@ server:
 # Repo server
 repoServer:
   replicas: 2
+  
+  # Pod labels for Workload Identity (required for token injection)
+  podLabels:
+    azure.workload.identity/use: "true"
+  
   resources:
     requests:
       cpu: 50m
@@ -84,6 +89,11 @@ repoServer:
 # Application controller
 controller:
   replicas: 1
+  
+  # Pod labels for Workload Identity (required for token injection)
+  podLabels:
+    azure.workload.identity/use: "true"
+  
   resources:
     requests:
       cpu: 100m
