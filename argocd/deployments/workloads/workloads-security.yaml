@@ -18,9 +18,9 @@ spec:
     # Add app-specific Helm repos as needed
 
   # Destination clusters and namespaces
-  # Apps can only deploy to non-platform namespaces
+  # Apps can only deploy to app-* namespaces (prevents deployment to platform namespaces)
   destinations:
-    - namespace: '*'
+    - namespace: 'app-*'
       server: https://kubernetes.default.svc
 
   # Apps cannot create cluster-scoped resources
@@ -72,7 +72,8 @@ spec:
     - group: 'rbac.authorization.k8s.io'
       kind: RoleBinding
 
-  # Block deployments to platform namespaces
-  # Note: This is enforced via destination restrictions above
+  # Monitor for orphaned resources
+  orphanedResources:
+    warn: true
 
   roles: []

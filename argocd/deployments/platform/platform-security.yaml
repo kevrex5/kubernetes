@@ -75,6 +75,10 @@ spec:
   # namespaceResourceBlacklist: []
   # clusterResourceBlacklist: []
 
+  # Monitor for orphaned resources
+  orphanedResources:
+    warn: true
+
   # Roles for RBAC (optional)
   roles: []
 

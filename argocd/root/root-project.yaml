@@ -1,0 +1,45 @@
+---
+# Root AppProject
+# Restricts the root app-of-apps to only manage ArgoCD resources
+# This follows the principle of least privilege - root should only create/manage Applications
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: root
+  namespace: rex5-cc-mz-k8s-argocd
+  finalizers:
+    - argoproj.io/finalizer
+spec:
+  description: Root app-of-apps manager - manages ArgoCD Applications only
+
+  # Source repositories allowed for this project
+  sourceRepos:
+    - 'git@github.com:kevrex5/kubernetes.git'
+    - 'https://github.com/kevrex5/kubernetes.git'
+
+  # Root can only deploy to the ArgoCD namespace
+  destinations:
+    - namespace: rex5-cc-mz-k8s-argocd
+      server: https://kubernetes.default.svc
+
+  # Root can only manage ArgoCD resources (Applications, ApplicationSets, AppProjects)
+  clusterResourceWhitelist:
+    - group: argoproj.io
+      kind: Application
+    - group: argoproj.io
+      kind: ApplicationSet
+    - group: argoproj.io
+      kind: AppProject
+
+  # No namespace-scoped resources needed for root
+  namespaceResourceWhitelist:
+    - group: argoproj.io
+      kind: Application
+    - group: argoproj.io
+      kind: ApplicationSet
+    - group: argoproj.io
+      kind: AppProject
+
+  # Monitor for orphaned resources
+  orphanedResources:
+    warn: true

@@ -10,11 +10,11 @@ metadata:
   finalizers:
     - argoproj.io/finalizer
 spec:
-  project: default  # Root app uses default project for full access
+  project: root  # Dedicated project with minimal permissions (see root-project.yaml)
 
   source:
     repoURL: git@github.com:kevrex5/kubernetes.git
-    targetRevision: HEAD  # TODO: Pin to tag/branch for production
+    targetRevision: master  # Pinned to main branch for stability
     path: argocd/deployments
     directory:
       recurse: true

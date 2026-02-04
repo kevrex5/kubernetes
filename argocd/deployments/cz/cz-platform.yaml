@@ -62,7 +62,7 @@ spec:
     # Helm chart (Cilium chart with only Hubble enabled)
     # NOTE: Match version to Azure-managed Cilium (see: az aks show --query currentKubernetesVersion)
     # AKS 1.31 = Cilium 1.16.x, AKS 1.32+ = Cilium 1.17.x
-    - repoURL: https://helm.cilium.io/
+    - repoURL: https://helm.cilium.io
       chart: cilium
       targetRevision: 1.17.12
       helm:
@@ -138,6 +138,7 @@ spec:
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
@@ -197,6 +198,7 @@ spec:
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
